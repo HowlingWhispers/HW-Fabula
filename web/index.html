@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fabula Pre-Alpha</title>
+  <link rel="stylesheet" href="/web/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">HOWLING WHISPERS // LIVE WORLD ENGINE</div>
+        <h1>FABULA <span class="version">PRE-ALPHA 0.0.1</span></h1>
+      </div>
+      <div class="world-meta">
+        <div id="world-name">BITTERROOT</div>
+        <div id="world-time">DAY 12 · 08:36</div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel actor-panel">
+        <div class="panel-title">ACTOR</div>
+        <div class="actor-name" id="actor-name">EIRVARGR</div>
+        <div class="muted" id="actor-age">17.365 YEARS</div>
+
+        <div class="meter-row">
+          <span>HEALTH</span>
+          <strong id="health">10 / 10</strong>
+        </div>
+        <div class="meter"><span id="health-bar"></span></div>
+
+        <div class="meter-row">
+          <span>FATIGUE</span>
+          <strong id="fatigue">2 / 10</strong>
+        </div>
+        <div class="meter"><span id="fatigue-bar"></span></div>
+
+        <div class="stat-pair"><span>COIN</span><strong id="coin">14</strong></div>
+        <div class="stat-pair"><span>NEXT CHECK BOOST</span><strong id="next-boost">0</strong></div>
+
+        <div class="subhead">INVENTORY</div>
+        <div id="inventory" class="inventory"></div>
+      </section>
+
+      <section class="panel state-panel">
+        <div class="panel-title">CURRENT STATE</div>
+        <div class="state-list">
+          <div><span>LOCATION</span><strong id="location">Hollowmere</strong></div>
+          <div><span>DETAIL</span><strong id="location-detail">market edge</strong></div>
+          <div><span>WEATHER</span><strong id="weather">Light rain</strong></div>
+          <div><span>VISIBILITY</span><strong id="visibility">poor</strong></div>
+          <div><span>ENCOUNTER</span><strong id="encounter">NONE</strong></div>
+        </div>
+
+        <div class="subhead">RESOLVE ACTION</div>
+        <label class="field-label" for="action-select">ACTION</label>
+        <select id="action-select"></select>
+        <div id="action-description" class="action-description"></div>
+
+        <div class="action-buttons">
+          <button id="resolve-button" class="primary">RESOLVE</button>
+          <button id="reset-button">RESET STATE</button>
+        </div>
+
+        <div class="authority">
+          <div class="authority-title">NARRATOR AUTHORITY</div>
+          <div><span>Describe result</span><strong>YES</strong></div>
+          <div><span>Alter result</span><strong>NO</strong></div>
+          <div><span>Create canon</span><strong>NO</strong></div>
+        </div>
+      </section>
+
+      <section class="panel resolution-panel">
+        <div class="panel-title">LAST RESOLUTION</div>
+        <div id="empty-resolution" class="empty-state">No action has been resolved yet.</div>
+        <div id="resolution" hidden>
+          <div id="classification" class="classification">SUCCESS + THREAT</div>
+          <div class="receipt-id" id="receipt-id"></div>
+
+          <div class="subhead">POOL</div>
+          <div id="pool" class="chips"></div>
+
+          <div class="subhead">WHY THIS CHECK?</div>
+          <div id="reasons" class="reason-list"></div>
+
+          <div class="subhead">RESULT</div>
+          <div id="result-grid" class="result-grid"></div>
+
+          <div class="subhead">STATE MUTATIONS</div>
+          <div id="mutations" class="mutation-list"></div>
+
+          <button id="diagnostics-button" class="wide">TOGGLE RAW RECEIPT</button>
+          <pre id="diagnostics" hidden></pre>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-title">WORLD EVENT LOG</div>
+        <div id="event-log" class="event-log"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>
