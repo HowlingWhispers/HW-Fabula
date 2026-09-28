@@ -1,22 +1,22 @@
-import { ACTIONS, buildCheck } from './actions.mjs';
+import { buildCheck, listActions as listWorldActions } from './actions.mjs';
 import { applyConsequences } from './consequences.mjs';
 import { rollNarrativePool } from './dice.mjs';
 import { cloneState } from './state.mjs';
 
-export function resolveAction(currentState, actionId, seed) {
+export function resolveAction(currentState, worldPackage, actionId, seed) {
   const state = cloneState(currentState);
-  const check = buildCheck(state, actionId);
+  const check = buildCheck(state, worldPackage, actionId);
   const roll = rollNarrativePool(check.pool, seed);
 
-  // A temporary boost is consumed by the check that uses it.
-  if (currentState.actor.temporary.nextCheckBoost > 0) {
+  if (currentState.actor.temporary?.nextCheckBoost > 0) {
     state.actor.temporary.nextCheckBoost = 0;
   }
 
-  const consequence = applyConsequences(state, check, roll);
+  const consequence = applyConsequences(state, worldPackage, check, roll);
   const receipt = {
     id: `fb_${state.clock.totalMinutes}_${roll.seed.toString(16).padStart(8, '0')}`,
-    schemaVersion: 1,
+    schemaVersion: 2,
+    worldId: state.meta.worldId,
     action: {
       id: check.action.id,
       label: check.action.label,
@@ -47,6 +47,6 @@ export function resolveAction(currentState, actionId, seed) {
   return { state, receipt };
 }
 
-export function listActions() {
-  return Object.values(ACTIONS);
+export function listActions(worldPackage) {
+  return listWorldActions(worldPackage);
 }
