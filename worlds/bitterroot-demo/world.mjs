@@ -17,6 +17,10 @@ export const WORLD_PACKAGE = Object.freeze({
       { id: 'travel', name: 'Travel' }
     ],
 
+    resourceLimits: {
+      fatigueMax: 10
+    },
+
     globalModifiers: [
       {
         when: 'actorStatAtLeast',
