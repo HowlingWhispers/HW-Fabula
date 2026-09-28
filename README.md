@@ -1,11 +1,16 @@
 # HW-Fabula
 
-Fabula is the Howling Whispers home for Fabula-specific gameplay and world-simulation design and future implementation.
+Fabula is the Howling Whispers home for Fabula-specific gameplay, AI runtime, and world-simulation design and implementation.
 
-Current status: planning.
+Current status: pre-alpha architecture / planning.
 
-The repository currently contains the narrative dice/resolution plan under `docs/plans/FABULA_NARRATIVE_DICE.md`.
+## Current plans
+
+- `docs/plans/FABULA_AI_RUNTIME.md` — headless AI/runtime architecture, persona embodiment, five-sense perception, scoped context, output auditing, multiplayer privacy, and UI-neutral runtime boundaries.
+- `docs/plans/FABULA_NARRATIVE_DICE.md` — narrative dice and uncertain-action resolution plan.
 
 Fabula-specific mechanics belong here rather than being stored in Orbis simply because Orbis is currently the more developed application.
+
+The runtime must remain independent of the current GUI. Desktop, web, mobile, terminal, or later redesigned interfaces should be clients of the same runtime rather than owning simulation rules.
 
 Canonical branch: `main`.
