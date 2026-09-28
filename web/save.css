@@ -42,6 +42,20 @@ select:focus {
   display: grid;
 }
 
+.changelog-link {
+  color: var(--cyan-dim);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-decoration: none;
+}
+
+.changelog-link:hover,
+.changelog-link:focus-visible {
+  color: var(--cyan);
+  text-decoration: underline;
+}
+
 @media (max-width: 620px) {
   .save-actions {
     grid-template-columns: 1fr;
