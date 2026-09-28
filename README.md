@@ -2,13 +2,19 @@
 
 Fabula is the Howling Whispers gameplay and persistent world-simulation runtime.
 
-**Current status: Pre-Alpha 0.0.3 prototype.**
+**Current status: Pre-Alpha 0.0.4 prototype.**
 
 Fabula is roleplay-first. The player writes naturally to the world. Fabula preserves that turn, checks authoritative world and character state, resolves only actions that genuinely need mechanics, persists the result, and prepares an immutable narration payload for the story layer.
 
 The simulation is underneath the roleplay, not the main user interface.
 
 For now Fabula is intentionally standalone. There is no Orbis dependency or server integration in this prototype.
+
+## Versioning and changelog
+
+Fabula uses explicit Pre-Alpha version bumps. The runtime version lives in `package.json` and `src/version.mjs`; CI verifies they stay in sync.
+
+See `CHANGELOG.md` for the milestone history and release notes.
 
 ## Run
 
@@ -50,6 +56,8 @@ The repository also runs the same test command through GitHub Actions on Pre-Alp
 - structured narration payload carrying the player turn, world state and mechanical receipts
 - narrator authority boundary: describe results, never override mechanics or create canon
 - synthetic non-Bitterroot test world to catch accidental core coupling
+- shared application version source and version-sync regression test
+- player-visible changelog link in the prototype UI
 
 The local narration shown for resolved demo actions is only a mechanical preview. The real prose response belongs to a later Speculus/provider narration bridge.
 
@@ -95,6 +103,7 @@ Planning and architecture documents:
 - `docs/plans/FABULA_NARRATIVE_DICE.md`
 - `docs/plans/FABULA_PRE_ALPHA.md`
 - `docs/WORLD_PACKAGES.md`
+- `CHANGELOG.md`
 
 Fabula-specific gameplay mechanics belong here rather than in Orbis.
 
