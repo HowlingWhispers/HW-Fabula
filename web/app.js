@@ -1,5 +1,6 @@
 import { submitRoleplayTurn } from '/src/roleplay.mjs';
 import { ageInYears, createStateFromWorldPackage, formatWorldTime, normalizeState } from '/src/state.mjs';
+import { FABULA_VERSION_LABEL } from '/src/version.mjs';
 import { listCurrencies } from '/src/world.mjs';
 import { WORLD_PACKAGES } from '/worlds/registry.mjs';
 import { SAVE_SLOTS, loadSlot, saveSlot, slotMetadata } from '/web/save-store.js';
@@ -158,6 +159,7 @@ function setStatus(message) {
 }
 
 function render() {
+  $('version-label').textContent = FABULA_VERSION_LABEL;
   $('world-name').textContent = world.name.toUpperCase();
   $('location').textContent = state.location.name;
   $('location-detail').textContent = state.location.detail ?? '';
