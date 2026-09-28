@@ -1,6 +1,6 @@
 {
   "name": "hw-fabula",
-  "version": "0.0.2-prealpha",
+  "version": "0.0.3-prealpha",
   "private": true,
   "type": "module",
   "scripts": {
