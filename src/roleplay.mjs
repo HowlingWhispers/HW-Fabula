@@ -1,16 +1,23 @@
 import { resolveAction } from './engine.mjs';
 import { normalizeState } from './state.mjs';
+import { compileWorldPackage } from './world.mjs';
+
+function intentMatches(source, intent) {
+  const allMatch = intent.all.length === 0 || intent.all.every((pattern) => pattern.test(source));
+  const anyMatch = intent.any.length === 0 || intent.any.some((pattern) => pattern.test(source));
+  return allMatch && anyMatch;
+}
 
 /**
  * Pre-alpha roleplay boundary.
  *
- * Fabula preserves the player's authored turn verbatim. It only maps a tiny
- * set of clearly recognized uncertain actions into mechanical action IDs.
- * The interpreter is intentionally conservative until the Speculus/provider
- * bridge can supply structured intent without giving the narrator authority
- * over Fabula's mechanics or canon.
+ * Fabula preserves the player's authored turn verbatim. World packages may
+ * declare conservative intent patterns that map prose to mechanical action
+ * IDs. Later, Speculus/provider interpretation can emit the same structured
+ * action IDs without gaining authority over mechanics or canon.
  */
-export function parseRoleplayTurn(text) {
+export function parseRoleplayTurn(worldPackage, text) {
+  const world = compileWorldPackage(worldPackage);
   const source = String(text ?? '').trim();
   if (!source) return { kind: 'empty', source, dialogue: [], actions: [] };
 
@@ -19,15 +26,10 @@ export function parseRoleplayTurn(text) {
   let match;
   while ((match = quotePattern.exec(source))) dialogue.push(match[1].trim());
 
-  const lowered = source.toLowerCase();
-  const actions = [];
-
-  if (/\b(climb|scramble)\b/.test(lowered)) actions.push('climb_muddy_bank');
-  if (/\b(sneak|creep|move quietly|slip past)\b/.test(lowered)) actions.push('move_quietly');
-  if (/\b(push on|keep going|continue|head out|walk|travel|follow the trail|take the trail)\b/.test(lowered)
-      && /\b(trail|road|path|walk|travel|going|out)\b/.test(lowered)) {
-    actions.push('push_on_trail');
-  }
+  const actions = world.compiled.intents
+    .filter((intent) => intentMatches(source, intent))
+    .map((intent) => intent.actionId)
+    .filter((actionId) => Boolean(world.rules.actions[actionId]));
 
   return {
     kind: actions.length
@@ -39,33 +41,20 @@ export function parseRoleplayTurn(text) {
   };
 }
 
-function localNarration(receipts) {
+function localNarration(worldPackage, receipts) {
   if (!receipts.length) return null;
-
+  const world = compileWorldPackage(worldPackage);
   const receipt = receipts.at(-1);
-  const success = receipt.outcome.success;
-  let line;
-
-  if (receipt.action.id === 'climb_muddy_bank') {
-    line = success
-      ? 'You find enough purchase to make the climb.'
-      : 'The wet ground gives under you before you can make the climb.';
-  } else if (receipt.action.id === 'move_quietly') {
-    line = success
-      ? 'You move through the poor visibility without giving away more than the roll allows.'
-      : 'Your attempt to move quietly does not hold.';
-  } else {
-    line = success
-      ? 'You make progress along the route.'
-      : 'The attempt to push onward stalls.';
-  }
-
-  return `${line} [${receipt.classification}]`;
+  const action = world.rules.actions[receipt.action.id];
+  const preview = receipt.outcome.success ? action?.preview?.success : action?.preview?.failure;
+  if (!preview) return `[${receipt.classification}]`;
+  return `${preview} [${receipt.classification}]`;
 }
 
-export function submitRoleplayTurn(currentState, text, options = {}) {
-  const parsed = parseRoleplayTurn(text);
-  let state = normalizeState(currentState);
+export function submitRoleplayTurn(currentState, worldPackage, text, options = {}) {
+  const world = compileWorldPackage(worldPackage);
+  const parsed = parseRoleplayTurn(world, text);
+  let state = normalizeState(currentState, world);
 
   if (parsed.kind === 'empty') {
     return { state, parsed, receipts: [], narrationRequest: null };
@@ -83,14 +72,12 @@ export function submitRoleplayTurn(currentState, text, options = {}) {
   const baseSeed = Number(options.seed ?? Date.now()) >>> 0;
 
   for (let i = 0; i < parsed.actions.length; i += 1) {
-    const result = resolveAction(working, parsed.actions[i], (baseSeed + i) >>> 0);
+    const result = resolveAction(working, world, parsed.actions[i], (baseSeed + i) >>> 0);
     working = result.state;
     receipts.push(result.receipt);
   }
 
-  // This is only a local mechanical preview. The real prose response belongs
-  // to the future Speculus/provider narration bridge.
-  const preview = localNarration(receipts);
+  const preview = localNarration(world, receipts);
   if (preview) {
     working.scene.transcript.push({
       id: `turn-${working.scene.transcript.length + 1}`,
@@ -103,7 +90,11 @@ export function submitRoleplayTurn(currentState, text, options = {}) {
   }
 
   const narrationRequest = {
-    worldId: working.meta.worldId,
+    world: {
+      id: world.id,
+      name: world.name,
+      packageSchemaVersion: world.schemaVersion
+    },
     instanceId: working.meta.instanceId,
     personaId: working.meta.personaId,
     location: structuredClone(working.location),
