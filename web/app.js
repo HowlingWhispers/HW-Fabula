@@ -1,35 +1,15 @@
-import { listActions, resolveAction } from '/src/engine.mjs';
-import { ageInYears, createInitialState, formatWorldTime } from '/src/state.mjs';
+import { submitRoleplayTurn } from '/src/roleplay.mjs';
+import { ageInYears, createInitialState, formatWorldTime, normalizeState } from '/src/state.mjs';
 
-const STORAGE_KEY = 'hw-fabula-prealpha-state-v1';
-const actions = listActions();
+const STORAGE_KEY = 'hw-fabula-prealpha-state-v2';
 let state = loadState();
-
+let lastNarrationRequest = null;
 const $ = (id) => document.getElementById(id);
-const actionSelect = $('action-select');
-
-actions.forEach((action) => {
-  const option = document.createElement('option');
-  option.value = action.id;
-  option.textContent = action.label;
-  actionSelect.appendChild(option);
-});
-
-actionSelect.addEventListener('change', renderActionDescription);
-$('resolve-button').addEventListener('click', resolveSelectedAction);
-$('reset-button').addEventListener('click', () => {
-  state = createInitialState();
-  saveState();
-  render();
-});
-$('diagnostics-button').addEventListener('click', () => {
-  $('diagnostics').hidden = !$('diagnostics').hidden;
-});
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : createInitialState();
+    return normalizeState(raw ? JSON.parse(raw) : createInitialState());
   } catch {
     return createInitialState();
   }
@@ -45,114 +25,130 @@ function freshSeed() {
   return value[0] || 1;
 }
 
-function resolveSelectedAction() {
-  const { state: nextState } = resolveAction(state, actionSelect.value, freshSeed());
-  state = nextState;
-  saveState();
-  render();
+function speakerClass(speaker) {
+  if (speaker === 'player') return 'player';
+  if (speaker === 'narrator') return 'narrator';
+  return 'npc';
 }
 
-function renderActionDescription() {
-  const action = actions.find((item) => item.id === actionSelect.value);
-  $('action-description').textContent = action?.description ?? '';
-}
+function renderTranscript() {
+  const entries = state.scene?.transcript ?? [];
+  const nodes = entries.map((entry) => {
+    const article = document.createElement('article');
+    article.className = `turn ${speakerClass(entry.speaker)}`;
 
-function worldTimeFromMinutes(totalMinutes) {
-  const day = Math.floor(totalMinutes / 1440);
-  const minuteOfDay = totalMinutes % 1440;
-  return formatWorldTime({ day, minuteOfDay });
+    const who = entry.speaker === 'player' ? state.actor.name : entry.speaker;
+    const label = document.createElement('div');
+    label.className = 'speaker';
+    label.textContent = who;
+
+    const body = document.createElement('div');
+    body.className = 'turn-text';
+    body.textContent = entry.text;
+
+    article.append(label, body);
+
+    if (entry.receiptId) {
+      const receipt = document.createElement('div');
+      receipt.className = 'inline-receipt';
+      receipt.textContent = state.lastResolution?.id === entry.receiptId
+        ? state.lastResolution.classification
+        : 'MECHANICAL RESULT';
+      article.append(receipt);
+    }
+
+    return article;
+  });
+
+  $('transcript').replaceChildren(...nodes);
+  $('transcript').scrollTop = $('transcript').scrollHeight;
 }
 
 function renderInventory() {
-  $('inventory').replaceChildren(...state.actor.inventory.map((item) => {
+  const nodes = state.actor.inventory.map((item) => {
     const row = document.createElement('div');
     row.className = 'inventory-item';
-    const durability = item.durability === null ? '' : ` · ${item.durability}%`;
-    row.innerHTML = `<span>${item.name}</span><small>x${item.quantity}${durability}</small>`;
-    return row;
-  }));
-}
-
-function renderResolution() {
-  const receipt = state.lastResolution;
-  $('empty-resolution').hidden = Boolean(receipt);
-  $('resolution').hidden = !receipt;
-  if (!receipt) return;
-
-  $('classification').textContent = receipt.classification;
-  $('receipt-id').textContent = `${receipt.id} · seed ${receipt.seed}`;
-
-  const poolOrder = ['ability', 'difficulty', 'boost', 'setback'];
-  $('pool').replaceChildren(...poolOrder.map((kind) => {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.textContent = `${kind.toUpperCase()} ×${receipt.pool[kind]}`;
-    return chip;
-  }));
-
-  $('reasons').replaceChildren(...receipt.reasons.map((reason) => {
-    const row = document.createElement('div');
-    row.className = 'reason';
-    row.innerHTML = `<span>${reason.source}</span><small>${reason.effect}</small>`;
-    return row;
-  }));
-
-  const resultEntries = [
-    ['NET SUCCESS', receipt.totals.success],
-    ['ADVANTAGE', receipt.outcome.advantage],
-    ['THREAT', receipt.outcome.threat],
-    ['MAJOR + / -', `${receipt.outcome.majorPositive} / ${receipt.outcome.majorNegative}`]
-  ];
-  $('result-grid').replaceChildren(...resultEntries.map(([label, value]) => {
-    const cell = document.createElement('div');
-    cell.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
-    return cell;
-  }));
-
-  const mutations = receipt.mutations.length ? receipt.mutations : [{ path: 'state', before: 'unchanged', after: 'unchanged', reason: 'no persistent mutation' }];
-  $('mutations').replaceChildren(...mutations.map((mutation) => {
-    const row = document.createElement('div');
-    row.className = 'mutation';
-    row.innerHTML = `<span>${mutation.path}<br><small>${mutation.reason}</small></span><small>${mutation.before} → ${mutation.after}</small>`;
-    return row;
-  }));
-
-  $('diagnostics').textContent = JSON.stringify(receipt, null, 2);
-}
-
-function renderEventLog() {
-  const rows = [...state.eventLog].reverse().map((event) => {
-    const row = document.createElement('div');
-    row.className = 'event';
-    row.dataset.type = event.type;
-    row.innerHTML = `<small>${worldTimeFromMinutes(event.at)}</small><strong>${event.text}</strong>`;
+    const suffix = item.durability == null
+      ? `x${item.quantity}`
+      : `x${item.quantity} · ${item.durability}%`;
+    row.innerHTML = `<strong>${item.name}</strong><span>${suffix}</span>`;
     return row;
   });
-  $('event-log').replaceChildren(...rows);
+  $('inventory').replaceChildren(...nodes);
 }
 
 function render() {
-  $('world-name').textContent = state.meta.worldName.toUpperCase();
+  $('location').textContent = state.location.name;
+  $('location-detail').textContent = state.location.detail;
   $('world-time').textContent = formatWorldTime(state.clock);
+  $('weather').textContent = state.weather.label;
+  $('scene-title').textContent = `${state.location.name} · ${state.location.detail}`;
   $('actor-name').textContent = state.actor.name.toUpperCase();
   $('actor-age').textContent = `${ageInYears(state).toFixed(3)} YEARS`;
   $('health').textContent = `${state.actor.health.current} / ${state.actor.health.max}`;
   $('fatigue').textContent = `${state.actor.fatigue} / 10`;
   $('coin').textContent = state.actor.coin;
-  $('next-boost').textContent = state.actor.temporary.nextCheckBoost;
-  $('location').textContent = state.location.name;
-  $('location-detail').textContent = state.location.detail;
-  $('weather').textContent = state.weather.label;
-  $('visibility').textContent = state.weather.visibility;
-  $('encounter').textContent = state.encounter ? state.encounter.name : 'NONE';
+  $('encounter').textContent = state.encounter?.name ?? 'None';
+  $('last-result').textContent = state.lastResolution?.classification ?? 'No roll has been required.';
+  $('diagnostics').textContent = lastNarrationRequest
+    ? JSON.stringify(lastNarrationRequest, null, 2)
+    : 'No turn submitted yet.';
 
-  $('health-bar').style.width = `${(state.actor.health.current / state.actor.health.max) * 100}%`;
-  $('fatigue-bar').style.width = `${state.actor.fatigue * 10}%`;
-
+  renderTranscript();
   renderInventory();
-  renderResolution();
-  renderEventLog();
-  renderActionDescription();
 }
 
+function submitTurn() {
+  const input = $('roleplay-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const result = submitRoleplayTurn(state, text, { seed: freshSeed() });
+  state = result.state;
+  lastNarrationRequest = result.narrationRequest;
+  saveState();
+  input.value = '';
+
+  const status = $('turn-status');
+  if (result.receipts.length) {
+    status.textContent = `${result.receipts.at(-1).classification} · mechanical result committed before narration`;
+  } else {
+    status.textContent = 'Turn committed · no mechanical roll required · narrator bridge pending';
+  }
+  status.hidden = false;
+
+  render();
+  input.focus();
+}
+
+$('composer').addEventListener('submit', (event) => {
+  event.preventDefault();
+  submitTurn();
+});
+
+$('roleplay-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    submitTurn();
+  }
+});
+
+for (const button of document.querySelectorAll('.tab')) {
+  button.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((item) => item.classList.toggle('active', item === button));
+    document.querySelectorAll('.tab-page').forEach((page) => page.classList.remove('active'));
+    $(`tab-${button.dataset.tab}`).classList.add('active');
+  });
+}
+
+$('reset-button').addEventListener('click', () => {
+  state = createInitialState();
+  lastNarrationRequest = null;
+  saveState();
+  $('turn-status').hidden = true;
+  render();
+  $('roleplay-input').focus();
+});
+
 render();
+$('roleplay-input').focus();
