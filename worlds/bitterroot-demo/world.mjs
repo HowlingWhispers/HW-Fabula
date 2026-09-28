@@ -17,6 +17,30 @@ export const WORLD_PACKAGE = Object.freeze({
       { id: 'travel', name: 'Travel' }
     ],
 
+    globalModifiers: [
+      {
+        when: 'actorStatAtLeast',
+        stat: 'fatigue',
+        value: 2,
+        die: 'setback',
+        count: 1,
+        reason: 'fatigue'
+      }
+    ],
+
+    consequenceDefaults: {
+      actionMinutes: { success: 5, failure: 8 },
+      threatMinutesPerPoint: 2,
+      threatMinutesMax: 4,
+      advantageMinutesPerPoint: 1,
+      advantageMinutesMax: 3,
+      fatigueFromThreat: 1,
+      recoverFatigueAtAdvantage: 2,
+      carryBoostOnFailureWithAdvantage: true,
+      majorNegativeFatiguePerPoint: 1,
+      majorPositiveNextCheckBoost: 1
+    },
+
     intents: [
       {
         actionId: 'climb_muddy_bank',
