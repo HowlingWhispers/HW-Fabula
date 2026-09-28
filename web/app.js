@@ -68,12 +68,19 @@ function renderInventory() {
   const nodes = state.actor.inventory.map((item) => {
     const row = document.createElement('div');
     row.className = 'inventory-item';
-    const suffix = item.durability == null
+
+    const name = document.createElement('strong');
+    name.textContent = item.name;
+
+    const detail = document.createElement('span');
+    detail.textContent = item.durability == null
       ? `x${item.quantity}`
       : `x${item.quantity} · ${item.durability}%`;
-    row.innerHTML = `<strong>${item.name}</strong><span>${suffix}</span>`;
+
+    row.append(name, detail);
     return row;
   });
+
   $('inventory').replaceChildren(...nodes);
 }
 
