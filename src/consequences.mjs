@@ -1,4 +1,5 @@
-import { advanceClock, findInventoryItem } from './state.mjs';
+import { advanceClock, findInventoryItemByTag } from './state.mjs';
+import { validateWorldPackage } from './world.mjs';
 
 function classify(outcome) {
   if (outcome.success && outcome.threat > 0) return 'SUCCESS + THREAT';
@@ -13,50 +14,89 @@ function addMutation(mutations, path, before, after, reason) {
   mutations.push({ path, before, after, reason });
 }
 
-export function applyConsequences(state, check, roll) {
+export function applyConsequences(state, worldPackage, check, roll) {
+  const world = validateWorldPackage(worldPackage);
+  const defaults = world.rules.consequenceDefaults ?? {};
+  const actionConfig = check.action.consequences ?? {};
   const outcome = roll.outcome;
   const mutations = [];
-  const actionId = check.action.id;
-  let minutes = outcome.success ? 5 : 8;
 
-  if (outcome.threat > 0) minutes += Math.min(4, outcome.threat * 2);
-  if (outcome.advantage > 0) minutes = Math.max(2, minutes - Math.min(3, outcome.advantage));
+  const baseMinutes = defaults.actionMinutes ?? { success: 5, failure: 8 };
+  let minutes = outcome.success
+    ? Number(baseMinutes.success ?? 5)
+    : Number(baseMinutes.failure ?? 8);
+
+  if (outcome.threat > 0) {
+    const perPoint = Number(defaults.threatMinutesPerPoint ?? 2);
+    const max = Number(defaults.threatMinutesMax ?? 4);
+    minutes += Math.min(max, outcome.threat * perPoint);
+  }
+
+  if (outcome.advantage > 0) {
+    const perPoint = Number(defaults.advantageMinutesPerPoint ?? 1);
+    const max = Number(defaults.advantageMinutesMax ?? 3);
+    minutes = Math.max(0, minutes - Math.min(max, outcome.advantage * perPoint));
+  }
 
   const beforeTime = state.clock.totalMinutes;
   advanceClock(state, minutes);
   addMutation(mutations, 'clock.totalMinutes', beforeTime, state.clock.totalMinutes, 'action duration');
 
-  const beforeFatigue = state.actor.fatigue;
-  if (outcome.threat > 0 || (!outcome.success && actionId === 'push_on_trail')) {
-    state.actor.fatigue = Math.min(10, state.actor.fatigue + 1);
-  } else if (outcome.advantage >= 2 && state.actor.fatigue > 0) {
-    state.actor.fatigue -= 1;
+  const beforeFatigue = Number(state.actor.fatigue ?? 0);
+  let fatigue = beforeFatigue;
+
+  if (outcome.threat > 0 && Number(defaults.fatigueFromThreat ?? 0) > 0) {
+    fatigue += Number(defaults.fatigueFromThreat);
   }
-  addMutation(mutations, 'actor.fatigue', beforeFatigue, state.actor.fatigue, 'effort / secondary result');
 
-  const beforeBoost = state.actor.temporary.nextCheckBoost;
-  state.actor.temporary.nextCheckBoost = (!outcome.success && outcome.advantage > 0) ? 1 : 0;
-  addMutation(mutations, 'actor.temporary.nextCheckBoost', beforeBoost, state.actor.temporary.nextCheckBoost, 'carry-over advantage');
+  if (!outcome.success && actionConfig.fatigueOnFailure) {
+    fatigue += Number(actionConfig.failureFatigue ?? 1);
+  }
 
-  if (actionId === 'climb_muddy_bank' && outcome.threat > 0) {
-    const rope = findInventoryItem(state, 'rope');
-    if (rope && rope.durability !== null) {
-      const before = rope.durability;
-      rope.durability = Math.max(0, rope.durability - Math.min(8, 2 + outcome.threat));
-      addMutation(mutations, 'actor.inventory.rope.durability', before, rope.durability, 'rope strained during climb');
+  const recoverAt = Number(defaults.recoverFatigueAtAdvantage ?? 0);
+  if (recoverAt > 0 && outcome.advantage >= recoverAt) {
+    fatigue -= 1;
+  }
+
+  if (outcome.majorNegative > 0) {
+    fatigue += outcome.majorNegative * Number(defaults.majorNegativeFatiguePerPoint ?? 0);
+  }
+
+  state.actor.fatigue = Math.max(0, Math.min(10, fatigue));
+  addMutation(mutations, 'actor.fatigue', beforeFatigue, state.actor.fatigue, 'configured effort / secondary result');
+
+  const beforeBoost = Number(state.actor.temporary?.nextCheckBoost ?? 0);
+  let nextBoost = 0;
+
+  if (defaults.carryBoostOnFailureWithAdvantage && !outcome.success && outcome.advantage > 0) {
+    nextBoost = 1;
+  }
+
+  if (outcome.majorPositive > 0) {
+    nextBoost = Math.max(nextBoost, Number(defaults.majorPositiveNextCheckBoost ?? 0));
+  }
+
+  state.actor.temporary.nextCheckBoost = nextBoost;
+  addMutation(mutations, 'actor.temporary.nextCheckBoost', beforeBoost, nextBoost, 'configured carry-over result');
+
+  const durability = actionConfig.threatDurability;
+  if (durability && outcome.threat > 0) {
+    const item = findInventoryItemByTag(state, durability.inventoryTag);
+    if (item && item.durability != null) {
+      const before = item.durability;
+      const loss = Math.min(
+        Number(durability.maxLoss ?? 8),
+        Number(durability.baseLoss ?? 0) + outcome.threat
+      );
+      item.durability = Math.max(0, item.durability - loss);
+      addMutation(
+        mutations,
+        `actor.inventory.${item.id}.durability`,
+        before,
+        item.durability,
+        durability.reason ?? 'configured threat durability loss'
+      );
     }
-  }
-
-  if (roll.outcome.majorNegative > 0) {
-    const before = state.actor.fatigue;
-    state.actor.fatigue = Math.min(10, state.actor.fatigue + roll.outcome.majorNegative);
-    addMutation(mutations, 'actor.fatigue', before, state.actor.fatigue, 'major negative result');
-  }
-
-  if (roll.outcome.majorPositive > 0) {
-    const before = state.actor.temporary.nextCheckBoost;
-    state.actor.temporary.nextCheckBoost = Math.max(state.actor.temporary.nextCheckBoost, 1);
-    addMutation(mutations, 'actor.temporary.nextCheckBoost', before, state.actor.temporary.nextCheckBoost, 'major positive result');
   }
 
   return {
