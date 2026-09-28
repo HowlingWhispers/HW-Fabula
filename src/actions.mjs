@@ -1,38 +1,48 @@
-import { findInventoryItem } from './state.mjs';
+import { findInventoryItemByTag } from './state.mjs';
+import { validateWorldPackage } from './world.mjs';
 
-export const ACTIONS = Object.freeze({
-  climb_muddy_bank: {
-    id: 'climb_muddy_bank',
-    label: 'Climb muddy bank',
-    skill: 'athletics',
-    difficulty: 2,
-    description: 'A compact physical-check demo used to exercise state, dice and persistent consequences.'
-  },
-  move_quietly: {
-    id: 'move_quietly',
-    label: 'Move quietly',
-    skill: 'stealth',
-    difficulty: 2,
-    description: 'A stealth-oriented demo check using visibility, fatigue and temporary advantages.'
-  },
-  push_on_trail: {
-    id: 'push_on_trail',
-    label: 'Push along rough trail',
-    skill: 'travel',
-    difficulty: 2,
-    description: 'A travel-oriented demo check that primarily advances time and fatigue.'
+function modifierApplies(state, modifier) {
+  switch (modifier.when) {
+    case 'inventoryTag':
+      return Boolean(findInventoryItemByTag(state, modifier.tag));
+    case 'weatherIncludes':
+      return String(state.weather?.label ?? '').toLowerCase().includes(String(modifier.value ?? '').toLowerCase());
+    case 'visibilityEquals':
+      return String(state.weather?.visibility ?? '').toLowerCase() === String(modifier.value ?? '').toLowerCase();
+    case 'actorStatAtLeast':
+      return Number(state.actor?.[modifier.stat] ?? 0) >= Number(modifier.value ?? 0);
+    default:
+      return false;
   }
-});
+}
 
-export function buildCheck(state, actionId) {
-  const action = ACTIONS[actionId];
-  if (!action) throw new Error(`Unknown action: ${actionId}`);
+function applyModifier(state, pool, reasons, modifier) {
+  if (!modifierApplies(state, modifier)) return;
+  if (!Object.prototype.hasOwnProperty.call(pool, modifier.die)) return;
 
-  const skill = state.actor.skills[action.skill] ?? 0;
+  const count = Math.max(0, Number(modifier.count ?? 1));
+  pool[modifier.die] += count;
+  reasons.push({
+    source: modifier.reason ?? modifier.when,
+    effect: `${modifier.die} +${count}`
+  });
+}
+
+export function getAction(worldPackage, actionId) {
+  const world = validateWorldPackage(worldPackage);
+  return world.rules.actions?.[actionId] ?? null;
+}
+
+export function buildCheck(state, worldPackage, actionId) {
+  const world = validateWorldPackage(worldPackage);
+  const action = world.rules.actions?.[actionId];
+  if (!action) throw new Error(`Unknown action for world ${world.id}: ${actionId}`);
+
+  const skill = Number(state.actor.skills?.[action.skill] ?? 0);
   const reasons = [];
   const pool = {
     ability: Math.max(1, skill),
-    difficulty: action.difficulty,
+    difficulty: Math.max(0, Number(action.difficulty ?? 0)),
     boost: 0,
     setback: 0
   };
@@ -40,32 +50,23 @@ export function buildCheck(state, actionId) {
   reasons.push({ source: `${action.skill} skill`, effect: `ability +${pool.ability}` });
   reasons.push({ source: 'base difficulty', effect: `difficulty +${pool.difficulty}` });
 
-  if (state.actor.temporary.nextCheckBoost > 0) {
+  if (state.actor.temporary?.nextCheckBoost > 0) {
     pool.boost += state.actor.temporary.nextCheckBoost;
     reasons.push({ source: 'previous advantage', effect: `boost +${state.actor.temporary.nextCheckBoost}` });
   }
 
-  if (state.actor.fatigue >= 2) {
-    pool.setback += 1;
-    reasons.push({ source: `fatigue ${state.actor.fatigue}`, effect: 'setback +1' });
+  for (const modifier of world.rules.globalModifiers ?? []) {
+    applyModifier(state, pool, reasons, modifier);
   }
 
-  if (actionId === 'climb_muddy_bank') {
-    const rope = findInventoryItem(state, 'rope');
-    if (rope && rope.quantity > 0 && rope.durability > 0) {
-      pool.boost += 1;
-      reasons.push({ source: 'rope available', effect: 'boost +1' });
-    }
-    if (state.weather.label.toLowerCase().includes('rain')) {
-      pool.setback += 1;
-      reasons.push({ source: 'wet ground', effect: 'setback +1' });
-    }
+  for (const modifier of action.modifiers ?? []) {
+    applyModifier(state, pool, reasons, modifier);
   }
 
-  if (actionId === 'move_quietly' && state.weather.visibility === 'poor') {
-    pool.boost += 1;
-    reasons.push({ source: 'poor visibility', effect: 'boost +1' });
-  }
+  return { action: structuredClone(action), pool, reasons };
+}
 
-  return { action, pool, reasons };
+export function listActions(worldPackage) {
+  const world = validateWorldPackage(worldPackage);
+  return Object.values(world.rules.actions ?? {}).map((action) => structuredClone(action));
 }
