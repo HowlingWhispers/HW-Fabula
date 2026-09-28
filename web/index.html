@@ -7,99 +7,85 @@
   <link rel="stylesheet" href="/web/styles.css" />
 </head>
 <body>
-  <div class="shell">
+  <div class="app-shell">
     <header class="topbar">
-      <div>
-        <div class="eyebrow">HOWLING WHISPERS // LIVE WORLD ENGINE</div>
-        <h1>FABULA <span class="version">PRE-ALPHA 0.0.1</span></h1>
+      <div class="brand">
+        <div class="eyebrow">HOWLING WHISPERS // FABULA</div>
+        <div class="title-row"><h1>BITTERROOT</h1><span>PRE-ALPHA 0.0.2</span></div>
       </div>
-      <div class="world-meta">
-        <div id="world-name">BITTERROOT</div>
-        <div id="world-time">DAY 12 · 08:36</div>
+      <div class="world-strip">
+        <strong id="location">Hollowmere</strong>
+        <span id="location-detail">market edge</span>
+        <span class="dot">•</span>
+        <span id="world-time">DAY 12 · 08:36</span>
+        <span class="dot">•</span>
+        <span id="weather">Light rain</span>
       </div>
     </header>
 
-    <main class="grid">
-      <section class="panel actor-panel">
-        <div class="panel-title">ACTOR</div>
-        <div class="actor-name" id="actor-name">EIRVARGR</div>
-        <div class="muted" id="actor-age">17.365 YEARS</div>
-
-        <div class="meter-row">
-          <span>HEALTH</span>
-          <strong id="health">10 / 10</strong>
+    <main class="play-layout">
+      <section class="story-card">
+        <div class="story-head">
+          <div>
+            <div class="eyebrow">LIVE SCENE</div>
+            <strong id="scene-title">Hollowmere · Market Edge</strong>
+          </div>
+          <div id="bridge-status" class="bridge-status">LOCAL PREVIEW · NARRATOR BRIDGE PENDING</div>
         </div>
-        <div class="meter"><span id="health-bar"></span></div>
 
-        <div class="meter-row">
-          <span>FATIGUE</span>
-          <strong id="fatigue">2 / 10</strong>
-        </div>
-        <div class="meter"><span id="fatigue-bar"></span></div>
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+        <div id="turn-status" class="turn-status" hidden></div>
 
-        <div class="stat-pair"><span>COIN</span><strong id="coin">14</strong></div>
-        <div class="stat-pair"><span>NEXT CHECK BOOST</span><strong id="next-boost">0</strong></div>
-
-        <div class="subhead">INVENTORY</div>
-        <div id="inventory" class="inventory"></div>
+        <form id="composer" class="composer">
+          <label for="roleplay-input">WRITE TO THE WORLD</label>
+          <textarea id="roleplay-input" rows="5" placeholder="Write what Eirvargr says, does, notices, or attempts…"></textarea>
+          <div class="composer-foot">
+            <span>Enter sends · Shift+Enter adds a new line</span>
+            <button type="submit" class="send">SEND TURN</button>
+          </div>
+        </form>
       </section>
 
-      <section class="panel state-panel">
-        <div class="panel-title">CURRENT STATE</div>
-        <div class="state-list">
-          <div><span>LOCATION</span><strong id="location">Hollowmere</strong></div>
-          <div><span>DETAIL</span><strong id="location-detail">market edge</strong></div>
-          <div><span>WEATHER</span><strong id="weather">Light rain</strong></div>
-          <div><span>VISIBILITY</span><strong id="visibility">poor</strong></div>
-          <div><span>ENCOUNTER</span><strong id="encounter">NONE</strong></div>
-        </div>
+      <aside class="side-rail">
+        <section class="rail-card">
+          <div class="rail-tabs">
+            <button class="tab active" data-tab="state" type="button">STATE</button>
+            <button class="tab" data-tab="inventory" type="button">INVENTORY</button>
+            <button class="tab" data-tab="diagnostics" type="button">DIAGNOSTICS</button>
+          </div>
 
-        <div class="subhead">RESOLVE ACTION</div>
-        <label class="field-label" for="action-select">ACTION</label>
-        <select id="action-select"></select>
-        <div id="action-description" class="action-description"></div>
+          <div id="tab-state" class="tab-page active">
+            <div class="actor-name" id="actor-name">EIRVARGR</div>
+            <div class="muted" id="actor-age">17.365 YEARS</div>
+            <div class="state-row"><span>Health</span><strong id="health">10 / 10</strong></div>
+            <div class="state-row"><span>Fatigue</span><strong id="fatigue">2 / 10</strong></div>
+            <div class="state-row"><span>Coin</span><strong id="coin">14</strong></div>
+            <div class="state-row"><span>Encounter</span><strong id="encounter">None</strong></div>
+            <div class="subhead">LAST MECHANICAL RESULT</div>
+            <div id="last-result" class="last-result">No roll has been required.</div>
+          </div>
 
-        <div class="action-buttons">
-          <button id="resolve-button" class="primary">RESOLVE</button>
-          <button id="reset-button">RESET STATE</button>
-        </div>
+          <div id="tab-inventory" class="tab-page">
+            <div id="inventory" class="inventory"></div>
+          </div>
 
-        <div class="authority">
-          <div class="authority-title">NARRATOR AUTHORITY</div>
-          <div><span>Describe result</span><strong>YES</strong></div>
-          <div><span>Alter result</span><strong>NO</strong></div>
-          <div><span>Create canon</span><strong>NO</strong></div>
-        </div>
-      </section>
+          <div id="tab-diagnostics" class="tab-page">
+            <div class="authority">
+              <div><span>Narrator may describe</span><strong>YES</strong></div>
+              <div><span>Narrator may alter outcome</span><strong>NO</strong></div>
+              <div><span>Narrator may create canon</span><strong>NO</strong></div>
+            </div>
+            <div class="subhead">LAST NARRATOR PAYLOAD</div>
+            <pre id="diagnostics">No turn submitted yet.</pre>
+            <button id="reset-button" type="button" class="secondary wide">RESET DEMO INSTANCE</button>
+          </div>
+        </section>
 
-      <section class="panel resolution-panel">
-        <div class="panel-title">LAST RESOLUTION</div>
-        <div id="empty-resolution" class="empty-state">No action has been resolved yet.</div>
-        <div id="resolution" hidden>
-          <div id="classification" class="classification">SUCCESS + THREAT</div>
-          <div class="receipt-id" id="receipt-id"></div>
-
-          <div class="subhead">POOL</div>
-          <div id="pool" class="chips"></div>
-
-          <div class="subhead">WHY THIS CHECK?</div>
-          <div id="reasons" class="reason-list"></div>
-
-          <div class="subhead">RESULT</div>
-          <div id="result-grid" class="result-grid"></div>
-
-          <div class="subhead">STATE MUTATIONS</div>
-          <div id="mutations" class="mutation-list"></div>
-
-          <button id="diagnostics-button" class="wide">TOGGLE RAW RECEIPT</button>
-          <pre id="diagnostics" hidden></pre>
-        </div>
-      </section>
-
-      <section class="panel log-panel">
-        <div class="panel-title">WORLD EVENT LOG</div>
-        <div id="event-log" class="event-log"></div>
-      </section>
+        <section class="rail-card compact">
+          <div class="eyebrow">FABULA PRINCIPLE</div>
+          <p>You write the roleplay. Fabula resolves only what needs mechanics, persists the world state, then hands an immutable result to the narrator.</p>
+        </section>
+      </aside>
     </main>
   </div>
 
