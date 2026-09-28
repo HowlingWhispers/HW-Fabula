@@ -5,7 +5,7 @@ export function createInitialState() {
   const ageYears = 17.365;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     meta: {
       worldId: 'bitterroot-demo',
       worldName: 'Bitterroot',
@@ -48,12 +48,38 @@ export function createInitialState() {
       }
     },
     encounter: null,
+    scene: {
+      id: 'hollowmere-market-demo',
+      transcript: [
+        {
+          id: 'scene-1',
+          speaker: 'narrator',
+          text: 'Light rain falls over Hollowmere at the market edge.',
+          at: totalMinutes
+        },
+        {
+          id: 'scene-2',
+          speaker: 'Ragna Holt',
+          text: '“You’re going out in that?”',
+          at: totalMinutes
+        }
+      ]
+    },
     lastResolution: null,
     eventLog: [
       { at: totalMinutes - 10, type: 'location', text: 'Arrived at Hollowmere market edge.' },
       { at: totalMinutes, type: 'system', text: 'Fabula Pre-Alpha state initialized.' }
     ]
   };
+}
+
+export function normalizeState(input) {
+  const state = structuredClone(input ?? createInitialState());
+  state.schemaVersion = 2;
+  state.scene ??= { id: 'scene', transcript: [] };
+  state.scene.transcript ??= [];
+  state.eventLog ??= [];
+  return state;
 }
 
 export function cloneState(state) {
