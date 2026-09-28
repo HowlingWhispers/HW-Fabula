@@ -1,10 +1,12 @@
 # HW-Fabula
 
-Fabula is the Howling Whispers gameplay and world-simulation runtime.
+Fabula is the Howling Whispers gameplay and persistent world-simulation runtime.
 
 **Current status: Pre-Alpha prototype.**
 
-The repository now contains a zero-dependency browser prototype that demonstrates the first authoritative gameplay loop: state -> check construction -> deterministic narrative dice -> persistent consequences -> inspectable receipt.
+Fabula is roleplay-first. The player writes naturally to the world. Fabula preserves that turn, checks authoritative world and character state, resolves only actions that genuinely need mechanics, persists the result, and prepares an immutable narration payload for the story layer.
+
+The simulation is underneath the roleplay, not the main user interface.
 
 ## Run
 
@@ -24,26 +26,51 @@ npm test
 
 ## Current prototype
 
-- dark live-world console UI
-- Bitterroot-flavored demo state
-- persistent browser state
-- world clock
-- health, fatigue, money and inventory
+- dominant roleplay transcript and freeform composer
+- Enter sends / Shift+Enter inserts a new line
+- Bitterroot-flavored demo scene and persistent browser state
+- conservative pre-alpha intent adapter for a few demonstration actions
+- world clock, health, fatigue, money and inventory
 - decimal age from a birth-world timestamp
 - deterministic recorded dice seeds
 - independent success/failure and advantage/threat dimensions
 - major positive/negative result channels
 - mechanical state mutations and event log
-- raw resolution diagnostics
-- narrator authority boundary: describe, never override mechanics or create canon
+- state, inventory and diagnostics kept secondary to the roleplay
+- structured narration payload carrying the player turn, world state and mechanical receipts
+- narrator authority boundary: describe results, never override mechanics or create canon
 
-The runtime is intentionally small. The next major step is replacing demo state with authoritative Fabula instance state imported from Orbis and then exposing immutable mechanical results to Speculus for narration.
+The local narration shown for resolved demo actions is only a mechanical preview. The real prose response belongs to the future Speculus/provider narration bridge.
+
+## Runtime direction
+
+The intended loop is:
+
+```text
+player roleplay
+    ↓
+intent / uncertainty detection
+    ↓
+authoritative Fabula state
+    ↓
+mechanical resolution only when required
+    ↓
+persistent state mutation
+    ↓
+immutable receipt
+    ↓
+Speculus / provider narration
+    ↓
+next roleplay turn
+```
+
+The next major step is replacing the demo state with authoritative Fabula instance state sourced from Orbis, then connecting the narration payload to Speculus without allowing generated prose to rewrite the mechanical result.
 
 Planning documents:
 
 - `docs/plans/FABULA_NARRATIVE_DICE.md`
 - `docs/plans/FABULA_PRE_ALPHA.md`
 
-Fabula-specific mechanics belong here rather than being stored in Orbis simply because Orbis is currently the more developed application.
+Fabula-specific gameplay mechanics belong here rather than in Orbis.
 
 Canonical branch: `main`.
