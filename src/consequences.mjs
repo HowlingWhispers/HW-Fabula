@@ -62,7 +62,9 @@ export function applyConsequences(state, worldPackage, check, roll) {
     fatigue += outcome.majorNegative * Number(defaults.majorNegativeFatiguePerPoint ?? 0);
   }
 
-  state.actor.fatigue = Math.max(0, Math.min(10, fatigue));
+  const configuredFatigueMax = Number(world.rules.resourceLimits?.fatigueMax);
+  const fatigueMax = Number.isFinite(configuredFatigueMax) ? configuredFatigueMax : Number.POSITIVE_INFINITY;
+  state.actor.fatigue = Math.max(0, Math.min(fatigueMax, fatigue));
   addMutation(mutations, 'actor.fatigue', beforeFatigue, state.actor.fatigue, 'configured effort / secondary result');
 
   const beforeBoost = Number(state.actor.temporary?.nextCheckBoost ?? 0);
