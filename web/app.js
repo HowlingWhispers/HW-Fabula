@@ -169,7 +169,10 @@ function render() {
   $('actor-name').textContent = state.actor.name.toUpperCase();
   $('actor-age').textContent = `${ageInYears(state).toFixed(3)} YEARS`;
   $('health').textContent = `${state.actor.health.current} / ${state.actor.health.max}`;
-  $('fatigue').textContent = `${state.actor.fatigue} / 10`;
+  const fatigueMax = Number(world.rules?.resourceLimits?.fatigueMax);
+  $('fatigue').textContent = Number.isFinite(fatigueMax)
+    ? `${state.actor.fatigue} / ${fatigueMax}`
+    : String(state.actor.fatigue);
   $('encounter').textContent = state.encounter?.name ?? 'None';
   $('last-result').textContent = state.lastResolution?.classification ?? 'No roll has been required.';
   $('diagnostics').textContent = lastNarrationRequest
