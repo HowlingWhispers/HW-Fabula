@@ -1,10 +1,18 @@
 # Changelog
 
+## 0.3.0-prealpha.4 - 2026-09-30
+
+### Fixed
+- Point the Fabula Orbis adapter at Orbis's real mounted Library API under `/api/v1/library` instead of the stale `/v1/library` path.
+- Update the read-only Fabula server bridge to allow and forward only `/api/v1/library` reads.
+- Reject successful non-API/HTML responses instead of silently interpreting them as an empty world list and showing a false `Orbis live` state.
+- Add regression coverage for the mounted Orbis Library path and unexpected successful page responses.
+
 ## 0.3.0-prealpha.3 - 2026-09-30
 
 ### Fixed
-- Keep the browser's native `fetch` bound to `window`/`globalThis` inside the Orbis adapter. Chromium-family browsers can throw `TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation` when the method is detached and later called with the adapter instance as its receiver.
-- Added a regression test that deliberately simulates a browser fetch requiring the correct global receiver.
+- Keep the browser's native `fetch` bound to `globalThis` so Chromium/Opera does not throw `Illegal invocation` when Fabula calls Orbis.
+- Add a regression test that fails if platform fetch is detached from its native receiver.
 
 ## 0.3.0-prealpha.2 - 2026-09-30
 
