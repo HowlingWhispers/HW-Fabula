@@ -7,9 +7,12 @@ export class FabulaRuntime {
     this.worldId = worldId;
     this.playerId = playerId;
     this.instanceId = instanceId;
-    this.canonMode = normalizeViewMode(canonMode);
     this.events = new EventBus();
     this.canon = new CanonEngine({ worldId, policy, now, idFactory });
+    const requestedMode = normalizeViewMode(canonMode);
+    this.canonMode = requestedMode === 'community' && !this.canon.policy.allowCommunityLayer
+      ? 'player-canon'
+      : requestedMode;
     this.worldSession = worldAdapter ? new WorldSession({ adapter: worldAdapter, worldId, playerId, instanceId, now }) : null;
     this.worldLoaded = false;
   }
@@ -62,6 +65,9 @@ export class FabulaRuntime {
 
   setCanonMode(mode) {
     const next = normalizeViewMode(mode);
+    if (next === 'community' && !this.canon.policy.allowCommunityLayer) {
+      throw new Error('This world owner has the Community Layer disabled.');
+    }
     if (next === this.canonMode) return this.canonMode;
     this.canonMode = next;
     this.events.emit('canon.view.changed', { mode: next, worldId: this.worldId, playerId: this.playerId });
@@ -106,8 +112,13 @@ export class FabulaRuntime {
   async importSave(save) {
     if (!save || typeof save !== 'object') throw new Error('Fabula save is invalid.');
     if (save.worldId !== this.worldId) throw new Error('Fabula save belongs to a different world.');
-    if (save.canonMode) this.canonMode = normalizeViewMode(save.canonMode);
     if (save.canon) this.canon.importState(save.canon);
+    if (save.canonMode) {
+      const savedMode = normalizeViewMode(save.canonMode);
+      this.canonMode = savedMode === 'community' && !this.canon.policy.allowCommunityLayer
+        ? 'player-canon'
+        : savedMode;
+    }
     if (this.worldSession) {
       if (!this.worldLoaded) await this.loadWorld();
       if (save.adventure) this.worldSession.restoreState(save.adventure);
