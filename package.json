@@ -1,6 +1,6 @@
 {
   "name": "hw-fabula",
-  "version": "0.3.0-prealpha.3",
+  "version": "0.3.0-prealpha.4",
   "private": true,
   "type": "module",
   "description": "Authoritative Fabula gameplay runtime with Orbis-backed shared worlds and private persistent instances.",
