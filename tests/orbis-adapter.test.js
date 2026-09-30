@@ -32,3 +32,16 @@ test('OrbisAdapter resolves a world and loads canonical children', async () => {
   assert.equal(loaded.placeById.get('bakery').parentLocationId, 'hollowmere');
   assert.ok(calls.some((url) => url.includes('type=world')));
 });
+
+test('OrbisAdapter keeps the platform fetch bound to globalThis', async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async function platformFetch() {
+    if (this !== globalThis) throw new TypeError('Illegal invocation');
+    return response({ items: [] });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const adapter = new OrbisAdapter({ baseUrl: 'https://orbis.example' });
+  const worlds = await adapter.listWorlds();
+  assert.deepEqual(worlds, []);
+});
