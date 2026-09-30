@@ -39,10 +39,17 @@ export function normalizeOrbisPlace(raw) {
 }
 
 export class OrbisAdapter {
-  constructor({ baseUrl = '/api/orbis', fetchImpl = globalThis.fetch } = {}) {
-    if (typeof fetchImpl !== 'function') throw new Error('OrbisAdapter requires a fetch implementation.');
+  constructor({ baseUrl = '/api/orbis', fetchImpl } = {}) {
+    const platformFetch = globalThis.fetch;
+    const resolvedFetch = fetchImpl ?? platformFetch;
+    if (typeof resolvedFetch !== 'function') throw new Error('OrbisAdapter requires a fetch implementation.');
     this.baseUrl = cleanBaseUrl(baseUrl);
-    this.fetchImpl = fetchImpl;
+    // Browser fetch is a Web API method and some Chromium builds reject it when
+    // detached from Window/globalThis. Preserve its native receiver while still
+    // allowing injected fetch implementations in tests and alternate clients.
+    this.fetchImpl = resolvedFetch === platformFetch
+      ? platformFetch.bind(globalThis)
+      : resolvedFetch;
   }
 
   async request(path) {
