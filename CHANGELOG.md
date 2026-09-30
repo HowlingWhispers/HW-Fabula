@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.4.0-prealpha.1 - 2026-09-30
+
+### Added
+- Three explicit shared-history layers: immutable authored canon, approved player canon, and optional non-canon community content.
+- Per-player/per-world canon view modes: `clean`, `player-canon`, and `community`.
+- Permanent `player-canon` provenance on approved player contributions so they never masquerade as world-author material.
+- `community` publication path for worlds that explicitly allow optional non-canon shared content.
+- Separate community revision tracking so optional material never advances official canon revision numbers.
+- World policy switches for accepting player-canon submissions and enabling the community layer.
+- Player-canon ticket queue limits and per-player community publication limits as anti-spam/storage controls.
+- Influence costs for community publication, with a configurable multiplier.
+- Runtime save persistence for the player's selected canon view mode.
+- Runtime snapshots exposing canon policy, community facts, selected view mode, and filtered shared contribution facts.
+- Regression coverage for disabled submissions, ticket caps, community opt-in, layer filtering, provenance flags, and legacy Canon Ledger state migration.
+
+### Changed
+- Canon proposals are now explicitly targeted at the `player-canon` layer.
+- Approved player contributions are marked `canonical: true` and `canonLayer: player-canon`.
+- Community contributions are marked `canonical: false` and `canonLayer: community`.
+- Canon Ledger state advances to schema version 2 while retaining import support for schema version 1.
+- Fabula save state advances to schema version 3 while older saves remain readable.
+- The Canon Ledger architecture document now treats bounded ticketing as the first governance model instead of assuming large-scale automated moderation.
+
+### Architecture
+- Clean Canon is a player-side filter, not a destructive rewrite of shared history.
+- Orbis-authored material remains the baseline and is never relabeled as player canon.
+- Storage location, hosting model, and canon status remain separate concerns.
+- Praxis remains separate and is not a Fabula dependency.
+
+### Still gated
+- The production Orbis write adapter must preserve these layer/provenance fields when approved or community records are eventually stored in Orbis.
+- World-owner policy editing is not yet exposed through Orbis UI.
+- Shared player/community records are not yet injected back into live Orbis-backed scenes.
+
 ## 0.3.0-prealpha.4 - 2026-09-30
 
 ### Fixed
