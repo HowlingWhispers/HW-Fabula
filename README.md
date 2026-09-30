@@ -1,10 +1,10 @@
 # HW-Fabula
 
-Fabula is the Howling Whispers home for authoritative gameplay, AI runtime, private player instances, and persistent shared-world history.
+Fabula is the Howling Whispers home for authoritative gameplay, AI runtime, private player instances, Influence, and persistent shared-world history.
 
-Current status: **pre-alpha playable world foundation**.
+Current status: **pre-alpha playable world foundation with layered shared history**.
 
-Current version: **0.3.0-prealpha.2**
+Current version: **0.4.0-prealpha.1**
 
 ## What is implemented
 
@@ -27,10 +27,45 @@ Current version: **0.3.0-prealpha.2**
 - private instance facts
 - Influence earning with weekly caps
 - impact-scaled proposal costs
+- simple bounded ticket queue for Player Canon submissions
 - owner/curator review gates
-- canon revisions and update feeds
-- provenance without private transcript leakage
+- permanent player-origin provenance on approved Player Canon
+- optional Community Layer that remains explicitly non-canonical
+- separate canon and community revision streams
+- anti-spam limits for pending tickets and community publication
+- privacy-preserving provenance without private transcript leakage
 - conflict hints for canon mutations
+
+### Shared-history modes
+
+Fabula now separates shared history into three layers:
+
+- **Authored Canon** — the original world-author record from Orbis.
+- **Player Canon** — approved player-created history, permanently flagged as player-originated.
+- **Community** — optional shared non-canon content that a world owner may allow.
+
+Players can select a per-world view mode:
+
+- `clean` — Authored Canon only.
+- `player-canon` — Authored Canon + approved Player Canon.
+- `community` — Authored Canon + Player Canon + optional Community content.
+
+Clean Canon is a filter. It does not delete shared player history or rewrite the world record.
+
+### World-owner contribution policy
+
+The runtime can enforce:
+
+- accepting or refusing Player Canon submission tickets
+- enabling or disabling the Community Layer separately
+- maximum open tickets per player
+- maximum community contributions per player
+- Influence cost scaling for community publication
+- weekly Influence caps
+- automatic low-impact approval threshold
+- curator approval ceiling
+
+The production Orbis UI for editing these policies is still to be built.
 
 ### Client foundation
 
@@ -43,9 +78,9 @@ Current version: **0.3.0-prealpha.2**
 
 ## Current boundary
 
-Fabula **reads real Orbis canon** in 0.3.
+Fabula **reads real Orbis canon**.
 
-Approved Canon Ledger proposals still remain inside Fabula's local pre-alpha ledger. They do not write back into Orbis yet. The production Canon Adapter and owner/curator write endpoint are the next server-side integration boundary.
+Approved Player Canon and Community Layer records still remain inside Fabula's local pre-alpha ledger. They do not write back into Orbis yet. The production Canon Adapter and owner/curator write endpoint must preserve each record's layer and provenance when that bridge is implemented.
 
 The freeform AI action interpreter, NovelAI narrative generation, dice/skills, inventory/economy, detailed travel time, encounters, NPC runtime and full perception engine are also later runtime layers. Unknown freeform commands currently make no authoritative state change.
 
@@ -86,7 +121,7 @@ npm test
 - `docs/plans/FABULA_AI_RUNTIME.md` - authoritative AI/runtime architecture, persona embodiment, perception, scoped context, output auditing, multiplayer privacy, and UI-neutral runtime boundaries.
 - `docs/plans/FABULA_DEFERRED_EMERGENCE.md` - snapshot-based off-screen simulation and deferred place/NPC development.
 - `docs/plans/FABULA_NARRATIVE_DICE.md` - narrative dice and uncertain-action resolution.
-- `docs/plans/FABULA_CANON_LEDGER.md` - private instance -> Influence -> proposal -> review -> canon -> propagation architecture.
+- `docs/plans/FABULA_CANON_LEDGER.md` - private instance → Influence → bounded ticket/community contribution → shared-history layers → propagation architecture.
 - `docs/plans/FABULA_ORBIS_WORLD_ADAPTER.md` - live Orbis world loading, starting Place anchoring, movement boundary, saves, mobile client, and future canon write-back seam.
 
 ## Architectural rule
