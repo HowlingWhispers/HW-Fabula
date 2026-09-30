@@ -3,6 +3,7 @@ import { FabulaRuntime } from '/src/runtime/fabula-runtime.js';
 
 const PROFILE_KEY = 'hw-fabula-profile-v1';
 const SAVE_KEY = 'hw-fabula-save-v2';
+const CANON_PREFS_KEY = 'hw-fabula-canon-preferences-v1';
 const DEFAULT_WORLD_NAME = 'Bitterroot';
 
 const adapter = new OrbisAdapter({ baseUrl: '/api/orbis' });
@@ -58,6 +59,26 @@ function readSave() {
   catch { return null; }
 }
 
+function readCanonPreferences() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CANON_PREFS_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function canonModePreference(worldId) {
+  const mode = readCanonPreferences()[worldId];
+  return ['clean', 'player-canon', 'community'].includes(mode) ? mode : null;
+}
+
+function storeCanonMode(worldId, mode) {
+  const prefs = readCanonPreferences();
+  prefs[worldId] = mode;
+  localStorage.setItem(CANON_PREFS_KEY, JSON.stringify(prefs));
+}
+
 function persist() {
   if (!runtime) return;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(runtime.exportSave())); }
@@ -109,7 +130,7 @@ function typeLabel(value) {
 }
 
 function statusClass(status) {
-  if (['canonized', 'approved'].includes(status)) return 'good';
+  if (['canonized', 'approved', 'community'].includes(status)) return 'good';
   if (status === 'rejected') return 'bad';
   return 'warn';
 }
@@ -142,18 +163,37 @@ function placePath(place, allPlaces) {
   return result.join(' / ');
 }
 
+function positiveNumber(value, fallback) {
+  return Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback;
+}
+
+function policyFromWorldAsset(worldAsset) {
+  const raw = worldAsset?.document?.fabulaPolicy;
+  const policy = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    startingInfluence: positiveNumber(policy.startingInfluence, 100),
+    weeklyInfluenceCap: positiveNumber(policy.weeklyInfluenceCap, 200),
+    autoApproveMaxImpact: positiveNumber(policy.autoApproveMaxImpact, 10),
+    curatorReviewMaxImpact: positiveNumber(policy.curatorReviewMaxImpact, 200),
+    refundRejectedProposal: policy.refundRejectedProposal === true,
+    acceptPlayerCanonSubmissions: policy.acceptPlayerCanonSubmissions !== false,
+    allowCommunityLayer: policy.allowCommunityLayer === true,
+    maxPendingProposalsPerPlayer: positiveNumber(policy.maxPendingProposalsPerPlayer, 5),
+    maxCommunityFactsPerPlayer: positiveNumber(policy.maxCommunityFactsPerPlayer, 20),
+    communityInfluenceMultiplier: positiveNumber(policy.communityInfluenceMultiplier, 0.5),
+  };
+}
+
 async function makeRuntime(worldId) {
+  const worldAsset = await adapter.getAsset(worldId);
+  const preferredMode = canonModePreference(worldId) ?? 'player-canon';
   runtime = new FabulaRuntime({
     worldId,
     playerId: profile.playerId,
     instanceId: profile.instanceId,
     worldAdapter: adapter,
-    policy: {
-      startingInfluence: 100,
-      weeklyInfluenceCap: 200,
-      autoApproveMaxImpact: 10,
-      curatorReviewMaxImpact: 200,
-    },
+    canonMode: preferredMode,
+    policy: policyFromWorldAsset(worldAsset),
   });
   wireRuntimeEvents();
   await runtime.loadWorld();
@@ -168,8 +208,10 @@ async function boot() {
   try {
     const saved = readSave();
     if (saved?.worldId) {
+      const preferredMode = canonModePreference(saved.worldId);
       await makeRuntime(saved.worldId);
       await runtime.importSave(saved);
+      if (preferredMode) runtime.setCanonMode(preferredMode);
       phase = runtime.snapshot().adventure?.started ? 'play' : 'start';
       sourceBadge.textContent = 'Orbis live';
       sourceBadge.className = 'status-pill live';
@@ -275,46 +317,83 @@ function playPage(snapshot) {
     </div>`;
 }
 
+function canonModeButton(snapshot, mode, title, description, disabled = false) {
+  const active = snapshot.canonMode === mode;
+  return `<button class="action-tile ${active ? 'active' : ''}" data-canon-mode="${mode}" ${disabled ? 'disabled' : ''}><strong>${escapeHtml(title)}</strong><span>${escapeHtml(description)}</span>${active ? '<span class="tag good">Selected</span>' : ''}</button>`;
+}
+
 function worldPage(snapshot) {
   const adventure = snapshot.adventure;
   const state = adventure.state;
-  return `<section class="page-head"><div><div class="eyebrow">WORLD SOURCE</div><h2>${escapeHtml(adventure.world.name)}</h2><p>This instance reads its canonical places from Orbis through a replaceable Fabula adapter.</p></div></section>
+  const policy = snapshot.canonPolicy;
+  return `<section class="page-head"><div><div class="eyebrow">WORLD SOURCE</div><h2>${escapeHtml(adventure.world.name)}</h2><p>This instance reads authored canon from Orbis and keeps player/community history in separate layers.</p></div></section>
     <section class="grid two">
       <div class="card"><h3>Orbis source</h3><p class="muted-copy">${escapeHtml(adventure.world.summary || 'No summary.')}</p><div class="kv"><span>World ID</span><strong>${escapeHtml(adventure.world.id)}</strong><span>Source</span><strong>${escapeHtml(adventure.world.sourceType || 'Orbis')}</strong><span>Places loaded</span><strong>${adventure.world.placeCount}</strong></div></div>
       <div class="card"><h3>Instance state</h3><div class="kv"><span>Current Place</span><strong>${escapeHtml(adventure.currentPlace?.name || 'Not started')}</strong><span>Visited Places</span><strong>${state?.visitedPlaceIds?.length || 0}</strong><span>Turns</span><strong>${state?.turnNumber || 0}</strong><span>Local tick</span><strong>${state?.localTick || 0}</strong></div><p class="muted-copy">Local tick currently counts scene transitions only. It is deliberately not pretending to be canonical travel time.</p></div>
     </section>
+    <section class="card">
+      <div class="section-title"><h3>Shared history mode</h3><small>per player · per world</small></div>
+      <p class="muted-copy">Authored Orbis canon is always present. This setting controls which player-created layers Fabula may add on top.</p>
+      <div class="action-grid">
+        ${canonModeButton(snapshot, 'clean', 'Clean Canon', 'Authored world canon only.')}
+        ${canonModeButton(snapshot, 'player-canon', 'Player Canon', 'Authored canon plus approved player history.')}
+        ${canonModeButton(snapshot, 'community', 'Community', policy.allowCommunityLayer ? 'Authored + player canon + optional community content.' : 'This world owner has the community layer disabled.', !policy.allowCommunityLayer)}
+      </div>
+    </section>
     <section class="card"><div class="notice">Fabula currently trusts only structural parent/child Place adjacency for movement. If Orbis has not supplied a route, the runtime refuses to invent a teleport or journey time.</div></section>
-    <section class="card"><div class="section-title"><h3>Save</h3><small>automatic local save</small></div><p class="muted-copy">Your private location, turn history, Influence and Canon Ledger state are saved automatically in this browser.</p><button class="button danger" data-new-instance>Start a new Fabula instance</button></section>`;
+    <section class="card"><div class="section-title"><h3>Save</h3><small>automatic local save</small></div><p class="muted-copy">Your private location, turn history, Influence, Canon Ledger state and shared-history preference are saved automatically in this browser.</p><button class="button danger" data-new-instance>Start a new Fabula instance</button></section>`;
 }
 
 function factCard(fact) {
   const impact = runtime.canon.calculateImpact(fact);
-  const cost = runtime.canon.calculateInfluenceCost(impact);
-  return `<article class="list-item"><div class="item-top"><div><h4>${escapeHtml(fact.title)}</h4><p>${escapeHtml(fact.summary)}</p></div>${fact.status === 'instance' ? `<button class="button primary" data-propose="${escapeHtml(fact.id)}">Propose · ${cost}</button>` : `<span class="tag ${statusClass(fact.status)}">${escapeHtml(fact.status)}</span>`}</div><div class="meta"><span class="tag">${escapeHtml(typeLabel(fact.type))}</span><span class="tag">${escapeHtml(fact.scope)}</span><span class="tag">Impact ${impact}</span></div></article>`;
+  const canonCost = runtime.canon.calculateInfluenceCost(impact);
+  const communityCost = runtime.canon.calculateCommunityCost(impact);
+  const policy = runtime.canon.getPolicy();
+  const actions = [];
+  if (fact.status === 'instance' && policy.acceptPlayerCanonSubmissions) {
+    actions.push(`<button class="button primary" data-propose="${escapeHtml(fact.id)}">Canon ticket · ${canonCost}</button>`);
+  }
+  if (fact.status === 'instance' && policy.allowCommunityLayer) {
+    actions.push(`<button class="button secondary" data-community="${escapeHtml(fact.id)}">Community · ${communityCost}</button>`);
+  }
+  if (fact.status === 'instance' && !actions.length) actions.push('<span class="tag warn">Sharing disabled by world owner</span>');
+  if (fact.status !== 'instance') actions.push(`<span class="tag ${statusClass(fact.status)}">${escapeHtml(fact.status)}</span>`);
+  return `<article class="list-item"><div class="item-top"><div><h4>${escapeHtml(fact.title)}</h4><p>${escapeHtml(fact.summary)}</p></div><div class="item-actions">${actions.join('')}</div></div><div class="meta"><span class="tag">${escapeHtml(typeLabel(fact.type))}</span><span class="tag">${escapeHtml(fact.scope)}</span><span class="tag">Impact ${impact}</span></div></article>`;
 }
 
 function ledgerPage(snapshot) {
   const weeklyKey = Object.keys(snapshot.wallet.earnedByWeek).sort().at(-1);
   const earned = weeklyKey ? snapshot.wallet.earnedByWeek[weeklyKey] : 0;
-  return `<section class="page-head"><div><div class="eyebrow">PRIVATE → PROPOSED</div><h2>Canon Ledger</h2><p>Private play facts stay in your instance until you deliberately spend Influence to propose them.</p></div></section>
+  const policy = snapshot.canonPolicy;
+  return `<section class="page-head"><div><div class="eyebrow">PRIVATE → SHARED</div><h2>Canon Ledger</h2><p>Private play facts stay in your instance until you deliberately spend Influence to share them through a world-author-approved lane.</p></div></section>
     <section class="grid two">
-      <div class="card"><h3>Influence</h3><div class="stat-row"><div class="stat"><strong>${snapshot.wallet.balance}</strong><span>balance</span></div><div class="stat"><strong>${earned}/${runtime.canon.policy.weeklyInfluenceCap}</strong><span>earned this week</span></div></div><p class="muted-copy">First visits to canonical Places currently earn a small validated exploration reward. Raw message volume earns nothing.</p></div>
-      <div class="card"><h3>Privacy boundary</h3><p class="muted-copy">A proposal carries the durable fact and opaque provenance references. The private roleplay transcript is not copied into the proposal payload.</p><button class="button secondary" data-record-fact>Record a private outcome</button></div>
+      <div class="card"><h3>Influence</h3><div class="stat-row"><div class="stat"><strong>${snapshot.wallet.balance}</strong><span>balance</span></div><div class="stat"><strong>${earned}/${policy.weeklyInfluenceCap}</strong><span>earned this week</span></div></div><p class="muted-copy">Raw message volume earns nothing. Contribution costs scale with impact.</p></div>
+      <div class="card"><h3>World contribution policy</h3><div class="kv"><span>Player Canon tickets</span><strong>${policy.acceptPlayerCanonSubmissions ? 'Open' : 'Closed'}</strong><span>Open ticket cap</span><strong>${policy.maxPendingProposalsPerPlayer}</strong><span>Community layer</span><strong>${policy.allowCommunityLayer ? 'Enabled' : 'Disabled'}</strong><span>Community cap</span><strong>${policy.maxCommunityFactsPerPlayer}</strong></div></div>
     </section>
+    <section class="card"><h3>Privacy boundary</h3><p class="muted-copy">Shared records carry the durable fact and opaque provenance references. Your private roleplay transcript is not copied into either Player Canon tickets or Community records.</p><button class="button secondary" data-record-fact>Record a private outcome</button></section>
     <section class="card"><div class="section-title"><h3>Instance facts</h3><small>${snapshot.localFacts.length}</small></div><div class="list">${snapshot.localFacts.length ? snapshot.localFacts.map(factCard).join('') : '<div class="empty">No durable private facts have been recorded yet. Exploration state itself remains private runtime state.</div>'}</div></section>`;
 }
 
 function proposalCard(proposal) {
   const canReview = proposal.status === 'pending';
-  return `<article class="list-item"><div class="item-top"><div><h4>${escapeHtml(proposal.publicPayload.title)}</h4><p>${escapeHtml(proposal.publicPayload.summary)}</p></div><span class="tag ${statusClass(proposal.status)}">${escapeHtml(proposal.status)}</span></div><div class="meta"><span class="tag">Impact ${proposal.impact}</span><span class="tag">Cost ${proposal.influenceCost}</span>${proposal.conflicts.length ? `<span class="tag bad">${proposal.conflicts.length} conflict hint</span>` : '<span class="tag good">No conflict hints</span>'}</div>${canReview ? `<div class="item-actions"><button class="button primary" data-review="approve" data-proposal="${escapeHtml(proposal.id)}">Approve locally</button><button class="button secondary" data-review="reject" data-proposal="${escapeHtml(proposal.id)}">Reject</button></div>` : ''}</article>`;
+  return `<article class="list-item"><div class="item-top"><div><h4>${escapeHtml(proposal.publicPayload.title)}</h4><p>${escapeHtml(proposal.publicPayload.summary)}</p></div><span class="tag ${statusClass(proposal.status)}">${escapeHtml(proposal.status)}</span></div><div class="meta"><span class="tag">Player Canon ticket</span><span class="tag">Impact ${proposal.impact}</span><span class="tag">Cost ${proposal.influenceCost}</span>${proposal.conflicts.length ? `<span class="tag bad">${proposal.conflicts.length} conflict hint</span>` : '<span class="tag good">No conflict hints</span>'}</div>${canReview ? `<div class="item-actions"><button class="button primary" data-review="approve" data-proposal="${escapeHtml(proposal.id)}">Approve locally</button><button class="button secondary" data-review="reject" data-proposal="${escapeHtml(proposal.id)}">Reject</button></div>` : ''}</article>`;
+}
+
+function sharedFactCard(fact) {
+  const label = fact.canonLayer === 'community' ? 'Community · non-canon' : `Player Canon · r${fact.revision}`;
+  return `<article class="list-item"><h4>${escapeHtml(fact.title)}</h4><p>${escapeHtml(fact.summary)}</p><div class="meta"><span class="tag ${fact.canonLayer === 'community' ? 'warn' : 'good'}">${escapeHtml(label)}</span><span class="tag">${escapeHtml(typeLabel(fact.type))}</span></div></article>`;
 }
 
 function canonPage(snapshot) {
-  return `<section class="page-head"><div><div class="eyebrow">SHARED HISTORY PIPELINE</div><h2>Canon</h2><p>The read side is connected to real Orbis canon. Canon Ledger write-back remains intentionally gated until the server adapter and owner review endpoint are implemented.</p></div></section>
-    <section class="card"><div class="notice warn"><strong>Important:</strong> approving a proposal here advances Fabula's local Canon Ledger only. It does not write into Orbis yet.</div></section>
+  return `<section class="page-head"><div><div class="eyebrow">SHARED HISTORY PIPELINE</div><h2>Canon</h2><p>Authored canon, approved Player Canon, and optional Community material remain separate and filterable.</p></div></section>
+    <section class="card"><div class="notice warn"><strong>Pre-alpha boundary:</strong> approving or publishing here still changes Fabula's local ledger only. Orbis write-back is not live yet.</div></section>
     <section class="grid two">
-      <div class="card"><div class="section-title"><h3>Fabula proposals</h3><small>${snapshot.proposals.length}</small></div><div class="list">${snapshot.proposals.length ? snapshot.proposals.map(proposalCard).join('') : '<div class="empty">No proposals submitted.</div>'}</div></div>
-      <div class="card"><div class="section-title"><h3>Local canon revisions</h3><small>r${snapshot.revision}</small></div><div class="list">${snapshot.canonFacts.length ? snapshot.canonFacts.map((fact) => `<article class="list-item"><h4>${escapeHtml(fact.title)}</h4><p>${escapeHtml(fact.summary)}</p><div class="meta"><span class="tag good">Local r${fact.revision}</span><span class="tag">${escapeHtml(typeLabel(fact.type))}</span></div></article>`).join('') : '<div class="empty">No Fabula proposal has been locally canonized.</div>'}</div></div>
+      <div class="card"><div class="section-title"><h3>Player Canon tickets</h3><small>${snapshot.proposals.length}</small></div><div class="list">${snapshot.proposals.length ? snapshot.proposals.map(proposalCard).join('') : '<div class="empty">No Player Canon tickets submitted.</div>'}</div></div>
+      <div class="card"><div class="section-title"><h3>Your active shared layers</h3><small>${escapeHtml(typeLabel(snapshot.canonMode))}</small></div><p class="muted-copy">Clean Canon filters all player-created shared history. Player Canon adds reviewed contributions. Community adds explicitly non-canon optional records.</p><div class="list">${snapshot.sharedFacts.length ? snapshot.sharedFacts.map(sharedFactCard).join('') : '<div class="empty">No player-created shared records are active in this view.</div>'}</div></div>
+    </section>
+    <section class="grid two">
+      <div class="card"><div class="section-title"><h3>Player Canon records</h3><small>r${snapshot.revision}</small></div><div class="list">${snapshot.canonFacts.length ? snapshot.canonFacts.map(sharedFactCard).join('') : '<div class="empty">No Player Canon record has been approved locally.</div>'}</div></div>
+      <div class="card"><div class="section-title"><h3>Community records</h3><small>c${snapshot.communityRevision}</small></div><div class="list">${snapshot.communityFacts.length ? snapshot.communityFacts.map(sharedFactCard).join('') : '<div class="empty">No optional Community records have been published locally.</div>'}</div></div>
     </section>`;
 }
 
@@ -369,7 +448,9 @@ function bindActions() {
   });
   document.querySelectorAll('[data-record-fact]').forEach((button) => button.addEventListener('click', () => factDialog.showModal()));
   document.querySelectorAll('[data-propose]').forEach((button) => button.addEventListener('click', () => proposeFact(button.dataset.propose)));
+  document.querySelectorAll('[data-community]').forEach((button) => button.addEventListener('click', () => publishCommunityFact(button.dataset.community)));
   document.querySelectorAll('[data-review]').forEach((button) => button.addEventListener('click', () => reviewProposal(button.dataset.proposal, button.dataset.review)));
+  document.querySelectorAll('[data-canon-mode]').forEach((button) => button.addEventListener('click', () => changeCanonMode(button.dataset.canonMode)));
   document.querySelector('[data-new-instance]')?.addEventListener('click', newInstance);
 }
 
@@ -427,24 +508,42 @@ function performAction(command) {
   }
 }
 
+function changeCanonMode(mode) {
+  try {
+    runtime.setCanonMode(mode);
+    storeCanonMode(runtime.worldId, mode);
+    persist();
+    render();
+    toast('Shared history changed', mode === 'clean' ? 'Clean Canon: authored world history only.' : mode === 'community' ? 'Community layer enabled for this world view.' : 'Approved Player Canon is active for this world view.');
+  } catch (error) { toast('Could not change history mode', error instanceof Error ? error.message : String(error)); }
+}
+
 function proposeFact(factId) {
   try {
     const proposal = runtime.propose(factId);
     persist(); render();
-    toast('Proposal submitted', `Status: ${proposal.status}. Influence cost ${proposal.influenceCost}.`);
+    toast('Player Canon ticket submitted', `Status: ${proposal.status}. Influence cost ${proposal.influenceCost}.`);
   } catch (error) { toast('Proposal blocked', error instanceof Error ? error.message : String(error)); }
+}
+
+function publishCommunityFact(factId) {
+  try {
+    const contribution = runtime.publishCommunity(factId);
+    persist(); render();
+    toast('Community record published', `Non-canon · ${contribution.influenceCost} Influence.`);
+  } catch (error) { toast('Community publication blocked', error instanceof Error ? error.message : String(error)); }
 }
 
 function reviewProposal(proposalId, decision) {
   try {
     runtime.review(proposalId, { reviewerId: 'local-world-owner', reviewerRole: 'owner', decision, note: 'Pre-alpha local review only; no Orbis write-back.' });
     persist(); render();
-    toast(decision === 'approve' ? 'Proposal approved' : 'Proposal rejected', 'This review remains inside the local Fabula ledger.');
+    toast(decision === 'approve' ? 'Player Canon ticket approved' : 'Player Canon ticket rejected', 'This review remains inside the local Fabula ledger.');
   } catch (error) { toast('Review failed', error instanceof Error ? error.message : String(error)); }
 }
 
 function newInstance() {
-  if (!confirm('Start a new Fabula instance? This clears the local Fabula save in this browser. Orbis canon is not changed.')) return;
+  if (!confirm('Start a new Fabula instance? This clears the local Fabula save in this browser. Orbis canon and your per-world shared-history preference are not changed.')) return;
   localStorage.removeItem(SAVE_KEY);
   localStorage.setItem(PROFILE_KEY, JSON.stringify({ playerId: profile.playerId, instanceId: randomId('instance') }));
   location.reload();
@@ -469,7 +568,7 @@ factForm.addEventListener('submit', (event) => {
     factForm.reset();
     factDialog.close();
     persist(); render();
-    toast('Private fact recorded', 'It stays inside this instance until you propose it.');
+    toast('Private fact recorded', 'It stays inside this instance until you share it through an enabled world contribution lane.');
   } catch (error) { toast('Could not record fact', error instanceof Error ? error.message : String(error)); }
 });
 
