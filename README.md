@@ -4,7 +4,7 @@ Fabula is the Howling Whispers home for authoritative gameplay, AI runtime, priv
 
 Current status: **pre-alpha playable world foundation**.
 
-Current version: **0.3.0-prealpha.1**
+Current version: **0.3.0-prealpha.2**
 
 ## What is implemented
 

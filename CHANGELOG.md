@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-prealpha.2 - 2026-09-30
+
+### Fixed
+- Normalize Place parent links that arrive as Orbis Library asset IDs back to canonical world-entry IDs before traversal.
+- Preserve the previous browser save while Fabula is still loading/restoring, so a failed canonical restore cannot overwrite the recoverable save with an empty session.
+- Recover player/instance identity from an existing save if the separate browser profile key is missing.
+- Correct local review feedback text for rejected proposals.
+
 ## 0.3.0-prealpha.1 - 2026-09-30
 
 ### Added

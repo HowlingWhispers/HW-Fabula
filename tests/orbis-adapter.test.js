@@ -17,7 +17,7 @@ test('OrbisAdapter resolves a world and loads canonical children', async () => {
     if (String(url).includes('/assets?')) return response({ items: [{ id: 'world-1', type: 'world', name: 'Bitterroot' }] });
     if (String(url).endsWith('/assets/world-1/children')) return response({ locations: [
       { id: 'hollowmere', libraryAssetId: 'place-1', name: 'Hollowmere', description: 'A market settlement.' },
-      { id: 'bakery', libraryAssetId: 'place-2', name: 'Bakery', parentLocationId: 'hollowmere', description: 'Warm bread and flour.' },
+      { id: 'bakery', libraryAssetId: 'place-2', name: 'Bakery', parentLocationId: 'place-1', description: 'Warm bread and flour.' },
     ], species: [], factions: [], societies: [], families: [], memories: [] });
     if (String(url).endsWith('/assets/world-1')) return response({ id: 'world-1', type: 'world', name: 'Bitterroot', summary: 'Living dark fantasy.' });
     throw new Error(`Unexpected URL ${url}`);
@@ -29,5 +29,6 @@ test('OrbisAdapter resolves a world and loads canonical children', async () => {
   assert.equal(loaded.name, 'Bitterroot');
   assert.equal(loaded.locations.length, 2);
   assert.equal(loaded.placeById.get('place-2').id, 'bakery');
+  assert.equal(loaded.placeById.get('bakery').parentLocationId, 'hollowmere');
   assert.ok(calls.some((url) => url.includes('type=world')));
 });

@@ -111,6 +111,11 @@ export class OrbisAdapter {
       byId.set(place.id, place);
       if (place.libraryAssetId) byId.set(place.libraryAssetId, place);
     }
+    for (const place of locations) {
+      if (!place.parentLocationId) continue;
+      const canonicalParent = byId.get(place.parentLocationId);
+      if (canonicalParent) place.parentLocationId = canonicalParent.id;
+    }
 
     return {
       id: String(world.id),

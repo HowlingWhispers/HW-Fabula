@@ -39,6 +39,12 @@ function loadProfile() {
   try {
     const current = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
     if (current?.playerId && current?.instanceId) return current;
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (saved?.playerId && saved?.instanceId) {
+      const recovered = { playerId: saved.playerId, instanceId: saved.instanceId };
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(recovered));
+      return recovered;
+    }
   } catch {}
   const profile = { playerId: randomId('player'), instanceId: randomId('instance') };
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
@@ -60,7 +66,7 @@ function persist() {
 
 function wireRuntimeEvents() {
   runtime.events.on('*', () => {
-    persist();
+    if (phase !== 'loading') persist();
     render();
   });
 }
@@ -433,7 +439,7 @@ function reviewProposal(proposalId, decision) {
   try {
     runtime.review(proposalId, { reviewerId: 'local-world-owner', reviewerRole: 'owner', decision, note: 'Pre-alpha local review only; no Orbis write-back.' });
     persist(); render();
-    toast(`Proposal ${decision}d`, 'This review remains inside the local Fabula ledger.');
+    toast(decision === 'approve' ? 'Proposal approved' : 'Proposal rejected', 'This review remains inside the local Fabula ledger.');
   } catch (error) { toast('Review failed', error instanceof Error ? error.message : String(error)); }
 }
 
