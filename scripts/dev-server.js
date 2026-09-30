@@ -22,7 +22,9 @@ function json(res, status, body) {
 async function proxyOrbis(req, res, url) {
   if (!['GET', 'HEAD'].includes(req.method ?? 'GET')) return json(res, 405, { error: 'Fabula Orbis bridge is read-only in this pre-alpha.' });
   const upstreamPath = `${url.pathname.slice('/api/orbis'.length)}${url.search}`;
-  if (!upstreamPath.startsWith('/v1/library/')) return json(res, 403, { error: 'Only the Orbis Library read API is exposed through this bridge.' });
+  if (!(upstreamPath === '/api/v1/library' || upstreamPath.startsWith('/api/v1/library/'))) {
+    return json(res, 403, { error: 'Only the Orbis Library read API is exposed through this bridge.' });
+  }
   try {
     const upstream = await fetch(`${orbisOrigin}${upstreamPath}`, {
       method: req.method,
