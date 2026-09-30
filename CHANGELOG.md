@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-prealpha.3 - 2026-09-30
+
+### Fixed
+- Keep the browser's native `fetch` bound to `window`/`globalThis` inside the Orbis adapter. Chromium-family browsers can throw `TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation` when the method is detached and later called with the adapter instance as its receiver.
+- Added a regression test that deliberately simulates a browser fetch requiring the correct global receiver.
+
 ## 0.3.0-prealpha.2 - 2026-09-30
 
 ### Fixed
