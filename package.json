@@ -1,9 +1,9 @@
 {
   "name": "hw-fabula",
-  "version": "0.2.0-prealpha.1",
+  "version": "0.3.0-prealpha.1",
   "private": true,
   "type": "module",
-  "description": "Authoritative gameplay runtime and shared-canon prototype for Howling Whispers Fabula.",
+  "description": "Authoritative Fabula gameplay runtime with Orbis-backed shared worlds and private persistent instances.",
   "scripts": {
     "dev": "node scripts/dev-server.js",
     "test": "node --test"
