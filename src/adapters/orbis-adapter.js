@@ -12,6 +12,8 @@ function makeUrl(baseUrl, path) {
   return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+const LIBRARY_API = '/api/v1/library';
+
 export class OrbisAdapterError extends Error {
   constructor(message, { status = 0, body = null, path = '' } = {}) {
     super(message);
@@ -75,8 +77,15 @@ export class OrbisAdapter {
   async listWorlds({ search = '', sort = 'name' } = {}) {
     const params = new URLSearchParams({ type: 'world', sort });
     if (cleanText(search)) params.set('search', cleanText(search));
-    const payload = await this.request(`/v1/library/assets?${params.toString()}`);
-    return Array.isArray(payload?.items) ? payload.items.filter((item) => item?.type === 'world' && !item.restricted) : [];
+    const path = `${LIBRARY_API}/assets?${params.toString()}`;
+    const payload = await this.request(path);
+    if (!payload || typeof payload !== 'object' || !Array.isArray(payload.items)) {
+      throw new OrbisAdapterError('Orbis Library returned an unexpected response instead of a world list.', {
+        body: payload,
+        path,
+      });
+    }
+    return payload.items.filter((item) => item?.type === 'world' && !item.restricted);
   }
 
   async findWorldByName(name) {
@@ -91,13 +100,13 @@ export class OrbisAdapter {
   getAsset(assetId) {
     const id = cleanText(assetId);
     if (!id) throw new Error('Asset ID is required.');
-    return this.request(`/v1/library/assets/${encodeURIComponent(id)}`);
+    return this.request(`${LIBRARY_API}/assets/${encodeURIComponent(id)}`);
   }
 
   getWorldChildren(worldId) {
     const id = cleanText(worldId);
     if (!id) throw new Error('World ID is required.');
-    return this.request(`/v1/library/assets/${encodeURIComponent(id)}/children`);
+    return this.request(`${LIBRARY_API}/assets/${encodeURIComponent(id)}/children`);
   }
 
   async loadWorld(worldId) {
@@ -106,12 +115,11 @@ export class OrbisAdapter {
       this.getWorldChildren(worldId),
     ]);
     if (world?.type !== 'world') throw new OrbisAdapterError('Selected Orbis record is not a world.', { body: world });
+    if (!children || typeof children !== 'object' || !Array.isArray(children.locations)) {
+      throw new OrbisAdapterError('Orbis Library returned an unexpected world-children response.', { body: children });
+    }
 
-    const rawLocations = Array.isArray(children?.locations)
-      ? children.locations
-      : Array.isArray(world?.document?.locations)
-        ? world.document.locations
-        : [];
+    const rawLocations = children.locations;
     const locations = rawLocations.map(normalizeOrbisPlace).filter((place) => place.id);
     const byId = new Map();
     for (const place of locations) {
@@ -132,7 +140,7 @@ export class OrbisAdapter {
       contentRating: world.contentRating ?? null,
       updatedAt: world.updatedAt ?? null,
       document: world.document ?? {},
-      children: children ?? {},
+      children,
       locations,
       placeById: byId,
       raw: world,
