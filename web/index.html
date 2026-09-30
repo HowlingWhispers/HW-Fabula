@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12161f">
+  <title>HW Fabula · Pre-alpha</title>
+  <link rel="stylesheet" href="/web/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">HOWLING WHISPERS</div>
+        <h1>Fabula</h1>
+      </div>
+      <div class="topbar-meta">
+        <span class="pill">pre-alpha</span>
+        <span class="revision" id="revisionBadge">r0</span>
+      </div>
+    </header>
+
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand-block">
+        <div class="brand-mark">F</div>
+        <div>
+          <strong>Fabula</strong>
+          <small>Shared history runtime</small>
+        </div>
+      </div>
+      <nav class="desktop-nav" id="desktopNav"></nav>
+      <div class="sidebar-note">
+        <strong>Fabula rule</strong>
+        <p>Your adventure is private. Only approved facts become shared canon.</p>
+      </div>
+    </aside>
+
+    <main class="content" id="content"></main>
+
+    <nav class="bottom-nav" id="bottomNav" aria-label="Mobile navigation"></nav>
+  </div>
+
+  <dialog id="proposalDialog">
+    <form method="dialog" class="dialog-card" id="proposalForm">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">CANON PROPOSAL</div>
+          <h2 id="proposalTitle">Submit fact</h2>
+        </div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <div id="proposalPreview"></div>
+      <div class="dialog-actions">
+        <button class="button secondary" value="cancel">Cancel</button>
+        <button class="button primary" value="submit" id="confirmProposal">Spend Influence</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>
