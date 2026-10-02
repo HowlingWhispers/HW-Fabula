@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.0-prealpha.1 - 2026-09-30
+
+### Added
+- Canonical NPC loading through the Orbis world adapter, with NPCs normalized and mapped by stable identity alongside Places.
+- NPC identity resolution by canonical ID, Library asset ID, full name, and alias, including exact-name-only matching that never invents a record from a partial token.
+- Deterministic NPC presence model: an NPC is present at a Place only when a canonical `locationId`, `workLocationId`, `homeLocationId`, or explicit `presences` entry names that Place. Presence is never inferred from a Place description's text.
+- Freeform conversation routing. Player input of the form `TALK TO <npc>`, `SPEAK TO <npc>`, `ASK <npc> ABOUT <topic>`, `TELL <npc> THAT <...>`, `<npc name>, <message>`, or `<npc name> <message>` now resolves the referenced NPC and checks canonical presence before routing.
+- Private relationship/memory state. Each conversation with a present NPC records a private per-instance interaction summary (interaction count, affinity, last contact turn, recent intents) that is never promoted to canon without explicit player action.
+- Runtime event `conversation.requested` carrying the structured context (referenced NPC, detected intent, presence, place, relationship state, and a correlation request id) so the later AI narrative layer can render prose without re-deriving presence.
+- `npc-not-present` outcome when a resolved NPC is referenced but is not canonically present at the current Place, with no state change and no summoning of the character.
+- Reference client surfaces canonical characters who are actually present at the current Place and lets the player start a conversation by tapping a name.
+- Regression coverage for NPC resolution, canonical presence (not prose) gating, the Brackenjaw Ranger Station guardrail, conversation intent classification, relationship accumulation, save/restore of relationships, and end-to-end `conversation.requested` emission.
+
+### Changed
+- `FabulaRuntime.act` now emits `conversation.requested` for routed conversations in addition to the existing turn lifecycle events.
+- `WorldSession.snapshot` now exposes `presentNPCs` and `relationships` for the current Place.
+- Fabula version advances to `0.5.0-prealpha.1`.
+
+### Architecture
+- NPC presence verification is an explicit, resolvable fact in the runtime rather than a prose inference. This is the foundation that keeps future AI prose generation from hallucinating a character into a scene.
+- NPC dialogue/narrative rendering remains a later runtime layer. The 0.5 turn records the verified interaction and emits structured context; it does not fabricate NPC speech.
+- The Orbis adapter canonicalizes NPC location references the same way it already canonicalizes Place parent links, so presence checks compare canonical Place IDs.
+
 ## 0.4.0-prealpha.1 - 2026-09-30
 
 ### Added

@@ -294,17 +294,25 @@ function playPage(snapshot) {
   const state = adventure.state;
   const breadcrumb = adventure.breadcrumb.map((entry) => `<span>${escapeHtml(entry.name)}</span>`).join('');
   const exits = adventure.exits.map((exit) => `<button class="exit-button" data-go-place="${escapeHtml(exit.name)}"><span><strong>${escapeHtml(exit.name)}</strong><br><small>${exit.id === place.parentLocationId ? 'Leave into parent Place' : 'Enter child Place'}</small></span><span>›</span></button>`).join('');
+  const presentNPCs = adventure.presentNPCs || [];
+  const npcs = presentNPCs.length
+    ? presentNPCs.map((npc) => `<button class="npc-pill" data-talk-to="${escapeHtml(npc.name)}"><strong>${escapeHtml(npc.name)}</strong>${npc.role ? `<span>${escapeHtml(npc.role)}</span>` : ''}</button>`).join('')
+    : '<div class="empty">No canonical characters are present here.</div>';
 
   return `<section class="page-head"><div><div class="eyebrow">PRIVATE INSTANCE</div><h2>${escapeHtml(adventure.world.name)}</h2><p>Orbis supplies canonical world facts. Fabula owns your mutable private session state.</p></div></section>
-    <section class="card scene-card">
-      <div class="scene-head"><div class="breadcrumb">${breadcrumb}</div><div class="scene-title">${escapeHtml(place.name)}</div></div>
-      <div class="scene-description">${escapeHtml(place.description || 'No canonical description has been authored for this Place yet.')}</div>
-      <div class="exits">${exits || '<div class="empty">No parent or child exits are defined for this Place yet.</div>'}</div>
-    </section>
-    <section class="card">
-      <div class="section-title"><h3>Private turn history</h3><small>${state.turnNumber} turns</small></div>
-      <div class="history">${historyMarkup(state.history)}</div>
-    </section>
+     <section class="card scene-card">
+       <div class="scene-head"><div class="breadcrumb">${breadcrumb}</div><div class="scene-title">${escapeHtml(place.name)}</div></div>
+       <div class="scene-description">${escapeHtml(place.description || 'No canonical description has been authored for this Place yet.')}</div>
+       <div class="exits">${exits || '<div class="empty">No parent or child exits are defined for this Place yet.</div>'}</div>
+     </section>
+     <section class="card">
+       <div class="section-title"><h3>Characters present</h3><small>${presentNPCs.length ? presentNPCs.length + ' canonical' : 'none'} here now</small></div>
+       <div class="npc-row">${npcs}</div>
+     </section>
+     <section class="card">
+       <div class="section-title"><h3>Private turn history</h3><small>${state.turnNumber} turns</small></div>
+       <div class="history">${historyMarkup(state.history)}</div>
+     </section>
     <div class="composer-wrap">
       <div class="quick-row">
         <button class="quick-action" data-command="look">Look</button>
@@ -438,6 +446,7 @@ function bindActions() {
   document.querySelectorAll('[data-start-place]').forEach((button) => button.addEventListener('click', () => startAt(button.dataset.startPlace)));
   document.querySelectorAll('[data-command]').forEach((button) => button.addEventListener('click', () => performAction(button.dataset.command)));
   document.querySelectorAll('[data-go-place]').forEach((button) => button.addEventListener('click', () => performAction(`go to ${button.dataset.goPlace}`)));
+  document.querySelectorAll('[data-talk-to]').forEach((button) => button.addEventListener('click', () => performAction(`talk to ${button.dataset.talkTo}`)));
   document.querySelector('#actionForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const input = event.currentTarget.elements.action;

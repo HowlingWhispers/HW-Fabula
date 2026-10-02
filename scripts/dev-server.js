@@ -1,7 +1,11 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const VERSION = require('../package.json').version;
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const port = Number(process.env.PORT ?? 4173);
@@ -28,7 +32,7 @@ async function proxyOrbis(req, res, url) {
   try {
     const upstream = await fetch(`${orbisOrigin}${upstreamPath}`, {
       method: req.method,
-      headers: { accept: 'application/json', 'user-agent': 'HW-Fabula/0.3 pre-alpha' },
+      headers: { accept: 'application/json', 'user-agent': `HW-Fabula/${VERSION}` },
       redirect: 'follow',
     });
     const body = Buffer.from(await upstream.arrayBuffer());
@@ -68,6 +72,6 @@ http.createServer(async (req, res) => {
     res.end('Not found');
   }
 }).listen(port, () => {
-  console.log(`Fabula 0.3 pre-alpha running on http://localhost:${port}`);
+  console.log(`Fabula ${VERSION} running on http://localhost:${port}`);
   console.log(`Orbis read bridge: ${orbisOrigin}`);
 });

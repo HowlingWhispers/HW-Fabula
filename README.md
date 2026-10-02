@@ -4,7 +4,7 @@ Fabula is the Howling Whispers home for authoritative gameplay, AI runtime, priv
 
 Current status: **pre-alpha playable world foundation with layered shared history**.
 
-Current version: **0.4.0-prealpha.1**
+Current version: **0.5.0-prealpha.1**
 
 ## What is implemented
 
@@ -20,6 +20,10 @@ Current version: **0.4.0-prealpha.1**
 - refusal to invent remote routes or travel times
 - versioned local save/resume
 - first-visit exploration milestones feeding Influence
+- canonical NPC loading from Orbis with deterministic identity resolution (name, alias, ID)
+- deterministic NPC presence model gated on canonical Place assignment, never prose inference
+- freeform conversation routing (TALK TO / ASK / TELL / addressed speech) to a present NPC only
+- private per-instance NPC relationship/memory state that never promotes to canon automatically
 
 ### Canon contribution foundation
 
@@ -78,11 +82,13 @@ The production Orbis UI for editing these policies is still to be built.
 
 ## Current boundary
 
-Fabula **reads real Orbis canon**.
+Fabula **reads real Orbis canon** and now verifies canonical NPC presence against structured world data before routing conversation.
 
-Approved Player Canon and Community Layer records still remain inside Fabula's local pre-alpha ledger. They do not write back into Orbis yet. The production Canon Adapter and owner/curator write endpoint must preserve each record's layer and provenance when that bridge is implemented.
+NPC presence is an explicit, resolvable fact in the runtime. An NPC is treated as present at a Place only when an Orbis record assigns them to it (`locationId`, `workLocationId`, `homeLocationId`, or `presences`). The place description text alone never summons a character, so a line like *"Ragna I need to speak to you"* routes to a real, canonically-present NPC or returns `npc-not-present` — it never hallucinates presence.
 
-The freeform AI action interpreter, NovelAI narrative generation, dice/skills, inventory/economy, detailed travel time, encounters, NPC runtime and full perception engine are also later runtime layers. Unknown freeform commands currently make no authoritative state change.
+Private relationship/memory state is recorded per instance and is never promoted to Player Canon or Community without explicit player action. Shared-history layers still remain inside Fabula's local pre-alpha ledger and do not write back into Orbis yet.
+
+NPC dialogue/narrative rendering is still a later runtime layer. The 0.5 turn records the verified interaction and emits a structured `conversation.requested` event with the limited, presence-checked context the prose layer needs — it does not fabricate NPC speech.
 
 ## Run the pre-alpha client
 
