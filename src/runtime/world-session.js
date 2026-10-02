@@ -1,3 +1,5 @@
+import { NPCRegistry } from './npc-registry.js';
+
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -28,10 +30,13 @@ export class WorldSession {
     this.now = now;
     this.world = null;
     this.state = null;
+    this.npcRegistry = null;
+    this._npcSeq = 0;
   }
 
   async loadWorld() {
     this.world = await this.adapter.loadWorld(this.worldId);
+    this.npcRegistry = new NPCRegistry({ npcs: this.world.npcs || [], placeById: this.world.placeById });
     return this.worldSummary();
   }
 
@@ -56,6 +61,26 @@ export class WorldSession {
     return partial.length === 1 ? partial[0] : null;
   }
 
+  resolveNPC(identifier) {
+    this.ensureLoaded();
+    return this.npcRegistry?.resolveNPC(identifier) ?? null;
+  }
+
+  publicNPC(npc) {
+    if (!this.npcRegistry) return null;
+    return this.npcRegistry.publicNPC(npc);
+  }
+
+  presentNPCs(place = this.currentPlace()) {
+    if (!this.npcRegistry) return [];
+    return this.npcRegistry.presentNPCs(place?.id ?? null);
+  }
+
+  isNPCAt(npc, place = this.currentPlace()) {
+    if (!this.npcRegistry) return false;
+    return this.npcRegistry.isPresentAt(npc, place?.id ?? null);
+  }
+
   availableStartingPlaces() {
     this.ensureLoaded();
     return [...this.world.locations].sort((left, right) => {
@@ -78,6 +103,7 @@ export class WorldSession {
       startedAt,
       updatedAt: startedAt,
       visitedPlaceIds: [place.id],
+      relationships: {},
       history: [],
     };
     return this.sceneResult('start', `You begin in ${place.name}.`);
@@ -203,7 +229,7 @@ export class WorldSession {
       return {
         ok: true,
         kind: 'help',
-        prose: 'This first authoritative slice understands LOOK, WHERE AM I, ENTER/GO TO <adjacent place>, LEAVE/BACK, INSPECT, and TRAVEL TO <place>. TRAVEL refuses to invent a route when Orbis has not supplied one.',
+        prose: 'This authoritative slice understands LOOK, WHERE AM I, INSPECT, ENTER/GO TO <adjacent place>, LEAVE/BACK, and TRAVEL TO <place>. It also routes freeform speech to a canonical NPC only when that NPC is canonically present at the current Place (TALK TO <npc>, ASK <npc> ABOUT <topic>, TELL <npc> THAT <...>, or "<npc name>, <message>"). TRAVEL refuses to invent a route when Orbis has not supplied one. NPC presence is never inferred from Place description text alone.',
         currentPlace: this.publicPlace(this.currentPlace()),
         stateChanges: [],
       };
@@ -261,12 +287,117 @@ export class WorldSession {
       return { ok: false, kind: 'unknown-place', prose: `No reachable canonical place matches “${text(moveMatch[1])}”.`, currentPlace: this.publicPlace(this.currentPlace()), stateChanges: [] };
     }
 
+    const npcAction = this.resolveNPCInteraction(raw, normalized);
+    if (npcAction) return npcAction;
+
     return {
       ok: false,
       kind: 'unresolved',
       prose: 'Fabula could not map that sentence to a deterministic authoritative action yet. No world state changed.',
       currentPlace: this.publicPlace(this.currentPlace()),
       stateChanges: [],
+    };
+  }
+
+  conversationIntent(remainder) {
+    const trimmed = normalizeQuery(remainder);
+    if (!trimmed) return 'greeting';
+    if (/\b(hello|hey\b|hi\b|greetings|howdy)\b/i.test(trimmed)) return 'greeting';
+    if (/\b(apologize|sorry|forgive|excuse me)\b/i.test(trimmed)) return 'greeting';
+    if (/\b(thank|sincere|appreciate|grateful)\b/i.test(trimmed)) return 'social';
+    if (/\b(question|what|who|where|when|why|how|tell me|do you know|know about|know of|information|explain|details|curious)\b/i.test(trimmed)) return 'inquiry';
+    if (/\b(speak to|talk to|i need to speak|can i talk|i want to talk|request)\b/i.test(trimmed)) return 'request-speech';
+    return 'freeform';
+  }
+
+  resolveNPCInteraction(raw, normalized) {
+    const place = this.currentPlace();
+    const placeName = place?.name ?? 'this place';
+
+    const commandMatch = raw.match(/^\s*(?:talk to|speak to|greet|address)\s+([^,]+?)\s*(?:,\s*(.*))?$/i);
+    let npc = null;
+    let remainder = '';
+    let askBranch = false;
+    if (commandMatch) {
+      npc = this.resolveNPC(commandMatch[1]);
+      remainder = commandMatch[2] ?? '';
+    } else {
+      const askMatch = raw.match(/^\s*ask\s+(.+?)\s+(?:about)\s+(.+)$/i);
+      const tellMatch = raw.match(/^\s*tell\s+(.+?)\s+that\s+(.+)$/i);
+      const targeted = askMatch || tellMatch;
+      if (targeted) {
+        askBranch = Boolean(askMatch);
+        npc = this.resolveNPC(targeted[1]);
+        remainder = targeted[2];
+      } else {
+        const commaMatch = raw.match(/^([^,]+?)\s*,\s*(.*)$/s);
+        if (commaMatch) {
+          npc = this.resolveNPC(commaMatch[1]);
+          remainder = commaMatch[2];
+        } else {
+          const tokens = normalized.split(/\s+/).filter(Boolean);
+          for (let size = Math.min(3, tokens.length); size >= 1; size -= 1) {
+            const head = tokens.slice(0, size).join(' ');
+            const candidate = this.npcRegistry?.resolveNPCName(head) ?? null;
+            if (candidate) {
+              const rest = tokens.slice(size).join(' ');
+              const markers = /\b(need|want|speak|talk|tell|ask|hello|hey|question|help|sor|thank|can i)\b/i;
+              if (!rest || markers.test(rest)) { npc = candidate; remainder = rest; }
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!npc) return null;
+
+    const isPresent = this.isNPCAt(npc, place);
+    if (!isPresent) {
+      return {
+        ok: false,
+        kind: 'npc-not-present',
+        prose: `${npc.name} exists in canon, but Fabula has no presence record for them at ${placeName}. They are not currently there, and the runtime will not summon them from the place description alone.`,
+        currentPlace: this.publicPlace(place),
+        referencedNPC: this.publicNPC(npc),
+        stateChanges: [],
+      };
+    }
+
+    const intent = askBranch ? 'inquiry' : this.conversationIntent(remainder);
+    const interaction = this.recordNPCInteraction(npc, intent);
+    return {
+      ok: true,
+      kind: 'conversation',
+      prose: `${npc.name} is present at ${placeName} and turns to address you. Fabula has routed your words to them; NPC dialogue rendering is a later runtime layer, so this turn is recorded privately against ${npc.name} (intent: ${intent}).`,
+      currentPlace: this.publicPlace(place),
+      referencedNPC: this.publicNPC(npc),
+      conversation: {
+        intent,
+        presence: 'present',
+        relationshipState: interaction,
+        conversationRequestId: `conv-${this.instanceId}-${this._npcSeq}`,
+      },
+      stateChanges: [
+        { field: 'relationships', note: `recorded private interaction with ${npc.name} (intent: ${intent})` },
+      ],
+    };
+  }
+
+  recordNPCInteraction(npc, intent) {
+    this.ensureStarted();
+    this._npcSeq += 1;
+    const rel = this.state.relationships[npc.id] || { affinity: 0, interactionCount: 0, lastContactTurn: null, interactions: [] };
+    rel.interactionCount += 1;
+    rel.lastContactTurn = this.state.turnNumber + 1;
+    rel.affinity = Math.max(-100, Math.min(100, rel.affinity + 1));
+    rel.interactions.push({ turn: this.state.turnNumber + 1, intent, at: this.now().toISOString() });
+    rel.interactions = rel.interactions.slice(-50);
+    this.state.relationships[npc.id] = rel;
+    return {
+      affinity: rel.affinity,
+      interactionCount: rel.interactionCount,
+      lastContactTurn: rel.lastContactTurn,
     };
   }
 
@@ -313,6 +444,8 @@ export class WorldSession {
       currentPlace: this.state ? this.publicPlace(this.currentPlace()) : null,
       exits: this.state ? this.adjacentPlaces().map((place) => this.publicPlace(place)) : [],
       breadcrumb: this.state ? this.breadcrumb() : [],
+      presentNPCs: this.state ? this.presentNPCs().map((npc) => this.publicNPC(npc)) : [],
+      relationships: this.state ? clone(this.state.relationships) : {},
       startingPlaces: this.availableStartingPlaces(),
     };
   }
@@ -337,9 +470,25 @@ export class WorldSession {
       startedAt: text(saved.startedAt) || this.now().toISOString(),
       updatedAt: text(saved.updatedAt) || this.now().toISOString(),
       visitedPlaceIds: Array.isArray(saved.visitedPlaceIds) ? [...new Set(saved.visitedPlaceIds.map(String).filter((id) => this.world.placeById.has(id)))] : [place.id],
+      relationships: this.#restoreRelationships(saved.relationships),
       history: Array.isArray(saved.history) ? saved.history.slice(-200) : [],
     };
     if (!this.state.visitedPlaceIds.includes(place.id)) this.state.visitedPlaceIds.push(place.id);
     return this.snapshot();
+  }
+
+  #restoreRelationships(saved) {
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    const result = {};
+    for (const [npcId, value] of Object.entries(saved)) {
+      if (!value || typeof value !== 'object') continue;
+      result[npcId] = {
+        affinity: Number.isInteger(value.affinity) ? value.affinity : 0,
+        interactionCount: Number.isInteger(value.interactionCount) && value.interactionCount >= 0 ? value.interactionCount : 0,
+        lastContactTurn: Number.isInteger(value.lastContactTurn) ? value.lastContactTurn : null,
+        interactions: Array.isArray(value.interactions) ? value.interactions.slice(-50) : [],
+      };
+    }
+    return result;
   }
 }

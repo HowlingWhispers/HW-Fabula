@@ -37,6 +37,17 @@ export class FabulaRuntime {
     this.events.emit('turn.started', { input });
     const result = this.worldSession.act(input);
     this.events.emit('action.resolved', result);
+    if (result.kind === 'conversation') {
+      this.events.emit('conversation.requested', {
+        conversationRequestId: result.conversation?.conversationRequestId ?? null,
+        referencedNPC: result.referencedNPC,
+        intent: result.conversation?.intent ?? 'freeform',
+        presence: result.conversation?.presence ?? 'present',
+        place: result.currentPlace,
+        relationshipState: result.conversation?.relationshipState ?? null,
+        turn: result.turn,
+      });
+    }
     let influence = null;
     if (result.ok && result.kind === 'move' && result.firstVisit) {
       influence = this.awardInfluence(5, 'first visit to a canonical place', `visit:${result.currentPlace.id}`);

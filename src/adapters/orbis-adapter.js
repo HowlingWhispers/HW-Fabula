@@ -1,3 +1,5 @@
+import { normalizeOrbisNpc } from '../runtime/npc-registry.js';
+
 function cleanBaseUrl(value) {
   const base = String(value ?? '').trim() || '/api/orbis';
   return base.endsWith('/') ? base.slice(0, -1) : base;
@@ -132,6 +134,19 @@ export class OrbisAdapter {
       if (canonicalParent) place.parentLocationId = canonicalParent.id;
     }
 
+    const npcs = (children.npcs || children.characters || []).map(normalizeOrbisNpc).filter((npc) => npc.id);
+    const canonicalPlaceId = (ref) => {
+      if (!ref) return null;
+      const place = byId.get(ref);
+      return place ? place.id : ref;
+    };
+    for (const npc of npcs) {
+      npc.locationId = canonicalPlaceId(npc.locationId);
+      npc.workLocationId = canonicalPlaceId(npc.workLocationId);
+      npc.homeLocationId = canonicalPlaceId(npc.homeLocationId);
+      npc.presences = npc.presences.map(canonicalPlaceId).filter(Boolean);
+    }
+
     return {
       id: String(world.id),
       name: cleanText(world.name) || 'Unnamed world',
@@ -143,6 +158,7 @@ export class OrbisAdapter {
       children,
       locations,
       placeById: byId,
+      npcs,
       raw: world,
     };
   }
